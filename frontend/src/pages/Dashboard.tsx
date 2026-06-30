@@ -91,8 +91,8 @@ export const Dashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* Main Grid Widgets */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      {/* Main Widgets */}
+      <div className="flex flex-col gap-6 mb-8">
         {/* Market Fit Score Circular widget */}
         <div className="border border-border bg-white p-6 rounded flex flex-col items-center justify-center text-center">
           <h3 className="text-sm font-bold text-primary mb-4 flex items-center gap-1.5">
@@ -135,7 +135,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Missing Skills Widget */}
-        <div className="border border-border bg-white p-6 rounded lg:col-span-2 flex flex-col justify-between">
+        <div className="border border-border bg-white p-6 rounded flex flex-col justify-between min-h-[360px]">
           <div>
             <h3 className="text-sm font-bold text-primary mb-1 flex items-center gap-1.5">
               <ShieldCheck className="w-4.5 h-4.5 text-primary" />
@@ -144,7 +144,7 @@ export const Dashboard: React.FC = () => {
             <p className="text-[11px] text-text mb-4">Core skills missing from your profile, marked by prioritization index.</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[160px] overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-h-[280px] max-h-[320px] overflow-y-auto pr-1">
             {result.missingSkills.map((skill, index) => (
               <SkillGapCard key={index} skill={skill} />
             ))}
@@ -153,26 +153,28 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Roadmap & Suggestions splits */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Timeline (left 2 cols) */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="border-b border-border pb-3">
+        <div className="lg:col-span-2 w-full">
+          <div className="border-b border-border pb-2 mb-2">
             <h3 className="text-lg font-bold text-primary">Personalized Study Roadmap</h3>
             <p className="text-xs text-text mt-0.5">Month-by-month study curriculum designed to cover target capabilities.</p>
           </div>
-          
-          <RoadmapTimeline roadmap={result.roadmap} />
+
+          <div className="overflow-y-auto max-h-[420px] pr-1">
+            <RoadmapTimeline roadmap={result.roadmap} />
+          </div>
         </div>
 
         {/* Project & Resource Sidebar (right 1 col) */}
-        <div className="space-y-8">
+        <div className="w-full min-w-0 space-y-8">
           {/* Projects suggestions */}
-          <div className="space-y-3">
+          <div className="w-full space-y-3">
             <div className="border-b border-border pb-2">
               <h4 className="text-sm font-bold text-primary">Recommended Projects</h4>
               <p className="text-[10px] text-text">Practice exercises to construct a verified portfolio.</p>
             </div>
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid w-full grid-cols-1 gap-3">
               {result.projects.map((proj, idx) => (
                 <ProjectCard key={idx} project={proj} />
               ))}
@@ -180,12 +182,12 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Resources links */}
-          <div className="space-y-3">
+          <div className="w-full space-y-3">
             <div className="border-b border-border pb-2">
               <h4 className="text-sm font-bold text-primary">Curated Education</h4>
               <p className="text-[10px] text-text">Handpicked reference guides to cover technical fundamentals.</p>
             </div>
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid w-full grid-cols-1 gap-3">
               {result.resources.map((res, idx) => (
                 <ResourceCard key={idx} resource={res} />
               ))}

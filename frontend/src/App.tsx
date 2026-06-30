@@ -41,7 +41,7 @@ const App: React.FC = () => {
         {/* Footer */}
         <footer className="border-t border-border py-8 text-center text-xs text-muted mt-auto">
           <div className="max-w-7xl mx-auto px-4">
-            <p>© {new Date().getFullYear()} Career Compass. Designed for high-impact developers.</p>
+            <p>© {new Date().getFullYear()} Career Compass. Developed by Akash Sharma.</p>
           </div>
         </footer>
       </div>

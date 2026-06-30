@@ -20,7 +20,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({ resource }) => {
   };
 
   return (
-    <div className="border border-border bg-white p-5 rounded flex flex-col justify-between h-full">
+    <div className="w-full border border-border bg-white p-5 rounded flex flex-col justify-between h-full">
       <div>
         {/* Header Badges */}
         <div className="flex items-center justify-between mb-3">

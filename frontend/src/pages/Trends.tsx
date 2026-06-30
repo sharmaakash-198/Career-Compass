@@ -1,15 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendCard } from '../components/TrendCard';
+import { TrendingSkillInsightCard } from '../components/TrendingSkillInsightCard';
 import { TECH_TRENDS } from '../data/trends';
-import { BarChart3, Layers } from 'lucide-react';
+import { CAREER_ROLES } from '../data/roles';
+import { fetchTrendingSkillInsights } from '../services/skillInsights';
+import type { TrendingSkillInsight } from '../types';
+import { BarChart3, Layers, Building2 } from 'lucide-react';
 
 type CategoryType = 'All' | 'Languages' | 'Frameworks' | 'Tools' | 'AI & Data';
 
 export const Trends: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('All');
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('all');
+  const [skillInsights, setSkillInsights] = useState<TrendingSkillInsight[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(true);
 
   const categories: CategoryType[] = ['All', 'Languages', 'Frameworks', 'Tools', 'AI & Data'];
+
+  useEffect(() => {
+    let cancelled = false;
+    setInsightsLoading(true);
+
+    fetchTrendingSkillInsights(selectedRoleId === 'all' ? undefined : selectedRoleId)
+      .then((data) => {
+        if (!cancelled) setSkillInsights(data);
+      })
+      .finally(() => {
+        if (!cancelled) setInsightsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRoleId]);
 
   // Filter trends based on selected category
   const filteredTrends = selectedCategory === 'All'
@@ -130,13 +154,71 @@ export const Trends: React.FC = () => {
       </div>
 
       {/* Grid List of TrendCards */}
-      <div>
+      <div className="mb-12">
         <h3 className="text-base font-bold text-primary mb-4">Technology Breakdown</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTrends.map(trend => (
             <TrendCard key={trend.name} trend={trend} />
           ))}
         </div>
+      </div>
+
+      {/* Top trending skills by role & hiring companies */}
+      <div className="border-t border-border pt-10">
+        <div className="mb-6">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface border border-border text-xs font-semibold text-primary mb-3 w-fit">
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Hiring Signals</span>
+          </div>
+          <h3 className="text-xl font-bold text-primary">Top Trending Skills by Role</h3>
+          <p className="text-xs text-text mt-1 max-w-2xl">
+            In-demand skills mapped to career roles, with companies actively hiring for each capability.
+            Insights are refreshed daily once the AI agent pipeline is connected.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-6 bg-surface p-1 rounded border border-border w-fit">
+          <button
+            onClick={() => setSelectedRoleId('all')}
+            className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+              selectedRoleId === 'all'
+                ? 'bg-primary text-white'
+                : 'text-text hover:text-primary hover:bg-white'
+            }`}
+          >
+            All Roles
+          </button>
+          {CAREER_ROLES.map((role) => (
+            <button
+              key={role.id}
+              onClick={() => setSelectedRoleId(role.id)}
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                selectedRoleId === role.id
+                  ? 'bg-primary text-white'
+                  : 'text-text hover:text-primary hover:bg-white'
+              }`}
+            >
+              {role.name}
+            </button>
+          ))}
+        </div>
+
+        {insightsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="h-44 border border-border bg-surface rounded animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {skillInsights.map((insight) => (
+              <TrendingSkillInsightCard
+                key={`${insight.roleId}-${insight.skill}`}
+                insight={insight}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

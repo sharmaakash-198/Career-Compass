@@ -55,3 +55,11 @@ export interface AnalysisResult {
   projects: RecommendedProject[];
   resources: LearningResource[];
 }
+
+export interface TrendingSkillInsight {
+  skill: string;
+  roleId: string;
+  roleName: string;
+  growth: number;
+  topCompanies: string[];
+}

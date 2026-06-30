@@ -8,7 +8,7 @@ interface ProjectCardProps {
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
   return (
-    <div className="border border-border bg-white p-5 rounded flex flex-col justify-between h-full">
+    <div className="w-full border border-border bg-white p-5 rounded flex flex-col justify-between h-full">
       <div>
         {/* Header Icon */}
         <div className="w-8 h-8 rounded border border-border flex items-center justify-center text-primary mb-3">

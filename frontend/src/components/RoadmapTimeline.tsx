@@ -8,26 +8,26 @@ interface RoadmapTimelineProps {
 
 export const RoadmapTimeline: React.FC<RoadmapTimelineProps> = ({ roadmap }) => {
   return (
-    <div className="relative border-l border-border pl-6 ml-2 space-y-6">
+    <div className="relative border-l border-border pl-4 ml-1 space-y-2 pb-0">
       {roadmap.map((item, index) => (
-        <div key={index} className="relative">
+        <div key={index} className="relative last:mb-0">
           {/* Node Icon Indicator */}
-          <div className="absolute -left-[31px] top-1.5 w-[11px] h-[11px] rounded-full bg-primary border-2 border-white" />
+          <div className="absolute -left-[23px] top-1 w-[9px] h-[9px] rounded-full bg-primary border-2 border-white" />
 
           {/* Card Body */}
-          <div className="flat-card bg-surface border border-border p-5 rounded">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="w-4 h-4 text-text" />
-              <h4 className="text-sm font-bold text-primary">
+          <div className="flat-card bg-surface border border-border p-3 rounded">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Calendar className="w-3.5 h-3.5 text-text" />
+              <h4 className="text-sm font-bold text-primary leading-tight">
                 {item.month}
               </h4>
             </div>
 
             {/* Topics list */}
-            <ul className="space-y-2">
+            <ul className="space-y-0.5">
               {item.topics.map((topic, tIdx) => (
-                <li key={tIdx} className="flex items-center gap-2 text-xs text-text">
-                  <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                <li key={tIdx} className="flex items-center gap-1.5 text-xs text-text leading-snug">
+                  <div className="w-1 h-1 rounded-full bg-slate-400 shrink-0" />
                   <span>{topic}</span>
                 </li>
               ))}
