@@ -42,7 +42,7 @@ export const Trends: React.FC = () => {
 
   // Format historical data points for the main chart
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-  
+
   const chartData = months.map(month => {
     const dataPoint: Record<string, any> = { name: month };
     filteredTrends.forEach(trend => {
@@ -75,11 +75,10 @@ export const Trends: React.FC = () => {
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-              selectedCategory === cat
+            className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${selectedCategory === cat
                 ? 'bg-primary text-white'
                 : 'text-text hover:text-primary hover:bg-white'
-            }`}
+              }`}
           >
             {cat}
           </button>
@@ -99,29 +98,29 @@ export const Trends: React.FC = () => {
               <defs>
                 {filteredTrends.map((trend, idx) => (
                   <linearGradient key={trend.name} id={`color_${idx}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={lineColors[idx % lineColors.length]} stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor={lineColors[idx % lineColors.length]} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={lineColors[idx % lineColors.length]} stopOpacity={0.1} />
+                    <stop offset="95%" stopColor={lineColors[idx % lineColors.length]} stopOpacity={0} />
                   </linearGradient>
                 ))}
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="name" 
-                stroke="#64748b" 
+              <XAxis
+                dataKey="name"
+                stroke="#64748b"
                 fontSize={11}
                 tickLine={false}
                 axisLine={false}
               />
-              <YAxis 
-                stroke="#64748b" 
+              <YAxis
+                stroke="#64748b"
                 fontSize={11}
                 tickFormatter={(val) => `+${val}%`}
                 tickLine={false}
                 axisLine={false}
               />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#ffffff', 
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#ffffff',
                   borderColor: '#cbd5e1',
                   borderRadius: '4px',
                   boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)',
@@ -129,9 +128,9 @@ export const Trends: React.FC = () => {
                 }}
                 labelStyle={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '2px' }}
               />
-              <Legend 
-                verticalAlign="bottom" 
-                height={36} 
+              <Legend
+                verticalAlign="bottom"
+                height={36}
                 iconType="square"
                 iconSize={8}
                 wrapperStyle={{ fontSize: '10px', color: '#64748b', paddingTop: '10px' }}
