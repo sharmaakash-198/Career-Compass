@@ -17,6 +17,7 @@ export const Navbar: React.FC = () => {
   const navItems = [
     { name: 'Home', path: '/' },
     { name: 'Trends', path: '/trends' },
+    { name: 'Firms', path: '/firms' },
     { name: 'Assessment', path: '/assess' },
   ];
 
@@ -48,16 +49,15 @@ export const Navbar: React.FC = () => {
               key={item.path}
               to={item.path}
               id={`nav-link-${item.name.toLowerCase().replace(' ', '-')}`}
-              className={`text-sm font-medium transition-colors ${
-                isActive(item.path)
+              className={`text-sm font-medium transition-colors ${isActive(item.path)
                   ? 'text-primary font-bold'
                   : 'text-text hover:text-primary'
-              }`}
+                }`}
             >
               {item.name}
             </Link>
           ))}
-          
+
           <div className="h-4 w-px bg-border mx-2" />
 
           {userSession ? (
@@ -106,9 +106,8 @@ export const Navbar: React.FC = () => {
               key={item.path}
               to={item.path}
               onClick={() => setIsOpen(false)}
-              className={`text-sm font-medium p-2 rounded hover:bg-surface ${
-                isActive(item.path) ? 'text-primary font-bold bg-surface' : 'text-text'
-              }`}
+              className={`text-sm font-medium p-2 rounded hover:bg-surface ${isActive(item.path) ? 'text-primary font-bold bg-surface' : 'text-text'
+                }`}
             >
               {item.name}
             </Link>

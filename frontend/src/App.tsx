@@ -8,6 +8,7 @@ import { Trends } from './pages/Trends';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { NotFound } from './pages/NotFound';
+import { CompanyTrends } from './pages/CompanyTrends';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -30,6 +31,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/trends" element={<Trends />} />
+            <Route path="/firms" element={<CompanyTrends />} />
             <Route path="/assess" element={<ProtectedRoute><Assessment /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/login" element={<Login />} />
