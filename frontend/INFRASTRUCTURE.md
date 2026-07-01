@@ -335,7 +335,13 @@ sequenceDiagram
 
 # 9. Dashboard Architecture
 
-The Dashboard parses the saved calculation results to feed visual dashboard segments:
+The Dashboard parses the saved calculation results to feed visual dashboard segments, supporting interactive checklist status tracking for roadmaps, projects, and resources:
+
+*   **Status Tracking Persistence**:
+    *   Roadmap topics are tracked via `localStorage` key `cc_completed_topics`.
+    *   Recommended projects are tracked via `localStorage` key `cc_completed_projects`.
+    *   Learning resources are tracked via `localStorage` key `cc_completed_resources`.
+*   **Visual Completion State**: Completed cards render with emerald borders and line-through titles to distinguish them from active tasks.
 
 <div style="width: 100%; overflow-x: auto; border: 1px solid #1e293b; border-radius: 6px; padding: 16px; background-color: #0f172a; margin-bottom: 24px;">
 <div style="min-width: 1000px;">
@@ -352,9 +358,9 @@ graph TD
     
     circularRing -->|Reads marketFitScore| localDB[(LocalStorage)]
     gapsCard -->|Reads missingSkills| localDB
-    timelineNode -->|Reads roadmap| localDB
-    projCard -->|Reads projects| localDB
-    resCard -->|Reads resources| localDB
+    timelineNode -->|Reads roadmap & completedTopics| localDB
+    projCard -->|Reads projects & completedProjects| localDB
+    resCard -->|Reads resources & completedResources| localDB
 ```
 
 </div>
@@ -362,9 +368,14 @@ graph TD
 
 ---
 
-# 10. AI Agent Architecture (Future Planning)
+# 10. AI Agent Recommendations System
 
-When migrating to a live Spring Boot backend, a multi-agent AI system will evaluate assessments.
+The dashboard implements a weekly AI Agent Recommendations interface simulating background analysis of industry trends and hiring requirements:
+
+*   **Role-Targeted Suggestions**: Checks the user's `targetRole` to fetch high-value suggestions (e.g. Model Context Protocol for Frontend, LangGraph for AI/ML).
+*   **Curriculum updates (Roadmap)**: Appends the suggested topic to the roadmap month inside `localStorage` under `cc_assessment_result`.
+*   **Learning Resources updates**: Appends the suggested guide/book card to the educational resources array under `cc_assessment_result`.
+*   **Actionable Undo / Revert States**: Allows users to revert applied recommendations. Reverting a suggestion removes the topic or resource card and automatically resets checklist progress for that topic or resource if the user had checked it.
 
 <div style="width: 100%; overflow-x: auto; border: 1px solid #1e293b; border-radius: 6px; padding: 16px; background-color: #0f172a; margin-bottom: 24px;">
 <div style="min-width: 1000px;">
@@ -372,16 +383,11 @@ When migrating to a live Spring Boot backend, a multi-agent AI system will evalu
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
 graph TD
-    AIOrchestrator[Spring Boot AI Orchestrator]
-    AIOrchestrator --> resumeAgent[Resume Parsing Agent]
-    AIOrchestrator --> gapAgent[Skill Gap Identification Agent]
-    AIOrchestrator --> trendAgent[Market Trend Alignment Agent]
-    AIOrchestrator --> roadmapAgent[Roadmap Generator Agent]
-    
-    resumeAgent --> Groq[Groq Llama Inference Endpoint]
-    gapAgent --> Groq
-    trendAgent --> Groq
-    roadmapAgent --> Groq
+    AIAgent[Weekly AI Recommendation Agent] -->|Evaluates targetRole| DashboardPage[Dashboard Page Component]
+    DashboardPage -->|Add Suggestion| applyAction[Update localStorage cc_assessment_result]
+    DashboardPage -->|Undo Suggestion| revertAction[Remove from localStorage cc_assessment_result & Clean checklists]
+    applyAction -->|Renders updated elements| RoadmapTimeline[RoadmapTimeline Component]
+    applyAction -->|Renders updated cards| ResourceCard[ResourceCard Components]
 ```
 
 </div>
