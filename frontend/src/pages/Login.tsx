@@ -13,7 +13,7 @@ export const Login: React.FC = () => {
       const namePrefix = email.split('@')[0];
       const displayName = namePrefix.charAt(0).toUpperCase() + namePrefix.slice(1);
       localStorage.setItem('user_session', JSON.stringify({ name: displayName, email }));
-      navigate('/');
+      navigate('/dashboard');
       window.location.reload();
     }
   };

@@ -12,7 +12,7 @@ export const Signup: React.FC = () => {
     if (name && email && password) {
       // Save mock session details
       localStorage.setItem('user_session', JSON.stringify({ name, email }));
-      navigate('/');
+      navigate('/dashboard');
       window.location.reload();
     }
   };

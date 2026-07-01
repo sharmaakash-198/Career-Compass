@@ -14,7 +14,7 @@ export const Landing: React.FC = () => {
       <Hero />
 
       {/* Problem Statement Section */}
-      <section className="max-w-7xl mx-auto px-4 py-16 border-t border-border">
+      <section className="max-w-screen-2xl mx-auto px-4 py-16 border-t border-border">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-text">The Challenge</span>
@@ -64,7 +64,7 @@ export const Landing: React.FC = () => {
       </section>
 
       {/* Trending Skills Preview */}
-      <section className="max-w-7xl mx-auto px-4 py-16 border-t border-border">
+      <section className="max-w-screen-2xl mx-auto px-4 py-16 border-t border-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mb-8">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-text">Market Insights</span>
