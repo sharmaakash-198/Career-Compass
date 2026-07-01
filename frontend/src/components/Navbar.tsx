@@ -16,8 +16,8 @@ export const Navbar: React.FC = () => {
 
   const navItems = [
     { name: 'Home', path: '/' },
-    { name: 'Trends', path: '/trends' },
-    { name: 'Firms', path: '/firms' },
+    { name: 'Career Trends', path: '/trends' },
+    { name: 'Company Insights', path: '/firms' },
     { name: 'Assessment', path: '/assess' },
   ];
 
@@ -36,13 +36,14 @@ export const Navbar: React.FC = () => {
   return (
     <nav className="w-full bg-white border-b border-border px-4 lg:px-8 py-4">
       <div className="max-w-[1700px] mx-auto flex items-center justify-between">
-        {/* Logo */}
+        
+        //Logo
         <Link to="/" className="flex items-center gap-2 group text-primary font-bold text-lg" id="nav-logo">
           <Compass className="w-5 h-5 text-primary" />
           <span>Career Compass</span>
         </Link>
 
-        {/* Desktop Menu */}
+        //Desktop Menu 
         <div className="hidden md:flex items-center gap-6">
           {navItems.map((item) => (
             <Link
@@ -88,7 +89,7 @@ export const Navbar: React.FC = () => {
           )}
         </div>
 
-        {/* Mobile Menu Toggle */}
+        //Mobile Menu Toggle 
         <button
           onClick={() => setIsOpen(!isOpen)}
           id="nav-toggle-mobile"
@@ -98,7 +99,7 @@ export const Navbar: React.FC = () => {
         </button>
       </div>
 
-      {/* Mobile Drawer */}
+      //Mobile Drawer 
       {isOpen && (
         <div className="md:hidden mt-4 pt-4 border-t border-border flex flex-col gap-3">
           {navItems.map((item) => (
