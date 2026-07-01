@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Landing } from './pages/Landing';
 import { Assessment } from './pages/Assessment';
@@ -9,15 +9,7 @@ import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { NotFound } from './pages/NotFound';
 import { CompanyTrends } from './pages/CompanyTrends';
-
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-}
-
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const isLoggedIn = !!localStorage.getItem('user_session');
-  return isLoggedIn ? <>{children}</> : <Navigate to="/login" replace />;
-};
+import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
   return (
