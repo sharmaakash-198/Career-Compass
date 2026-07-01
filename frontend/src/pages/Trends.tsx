@@ -245,7 +245,7 @@ export const Trends: React.FC = () => {
   const lineColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-4 py-6">
+    <div className="max-w-[1700px] mx-auto px-4 py-6">
       {/* Header Banner */}
       <div className="border-b border-border pb-6 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

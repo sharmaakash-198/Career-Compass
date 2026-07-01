@@ -345,7 +345,7 @@ export const Dashboard: React.FC = () => {
     : 0;
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-4 py-6">
+    <div className="max-w-[1700px] mx-auto px-4 py-6">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 p-3.5 bg-primary text-white border border-slate-700 rounded-lg shadow-xl text-xs font-semibold">
