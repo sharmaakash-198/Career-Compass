@@ -27,7 +27,7 @@ const App: React.FC = () => {
         <Navbar />
 
         {/* Page Container */}
-        <main className="flex-1 w-full max-w-7xl mx-auto py-6 px-4">
+        <main className="flex-1 w-full max-w-screen-2xl mx-auto py-6 px-4">
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/trends" element={<Trends />} />
@@ -42,7 +42,7 @@ const App: React.FC = () => {
 
         {/* Footer */}
         <footer className="border-t border-border py-8 text-center text-xs text-muted mt-auto">
-          <div className="max-w-7xl mx-auto px-4">
+          <div className="max-w-screen-2xl mx-auto px-4">
             <p>© {new Date().getFullYear()} Career Compass. Developed by Akash Sharma.</p>
           </div>
         </footer>

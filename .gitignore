@@ -34,8 +34,9 @@ dist-ssr
 Career_Compass_Frontend_Blueprint.md
 frontend/Career_Compass_Frontend_Blueprint.md
 frontend/Career Compass - Frontend Infrastructure.md
-frontend/INFRASTRUCTURE.md
 frontend/Ribbit Desktop - Frontend Infrastructure.md
 workflowww.md
 frontend/flow.md
-.cursor/rules/ponytail.mdc
+
+.agents/
+tsconfig.json
