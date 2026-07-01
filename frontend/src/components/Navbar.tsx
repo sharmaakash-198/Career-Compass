@@ -35,7 +35,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <nav className="w-full bg-white border-b border-border px-4 lg:px-8 py-4">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="max-w-screen-2xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 group text-primary font-bold text-lg" id="nav-logo">
           <Compass className="w-5 h-5 text-primary" />

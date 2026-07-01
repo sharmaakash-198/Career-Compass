@@ -1,6 +1,5 @@
 import React from 'react';
 import { TrendingUp } from 'lucide-react';
-import { ResponsiveContainer, LineChart, Line, YAxis } from 'recharts';
 import type { TechTrend } from '../types';
 
 interface TrendCardProps {
@@ -28,26 +27,9 @@ export const TrendCard: React.FC<TrendCardProps> = ({ trend }) => {
         </h3>
 
         {/* Description */}
-        <p className="text-xs text-text leading-relaxed mb-4">
+        <p className="text-xs text-text leading-relaxed">
           {trend.description}
         </p>
-      </div>
-
-      {/* Sparkline Visualisation */}
-      <div className="h-10 w-full opacity-80 mt-2">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={trend.history}>
-            <YAxis domain={['dataMin', 'dataMax']} hide />
-            <Line
-              type="monotone"
-              dataKey="growth"
-              stroke="#0f172a"
-              strokeWidth={1.5}
-              dot={false}
-              animationDuration={800}
-            />
-          </LineChart>
-        </ResponsiveContainer>
       </div>
     </div>
   );
