@@ -168,8 +168,7 @@ export const Dashboard: React.FC = () => {
     localStorage.removeItem('cc_completed_projects');
     localStorage.removeItem('cc_completed_resources');
     localStorage.removeItem('cc_applied_recommendations');
-    navigate('/assess');
-    window.location.reload();
+    navigate('/assess', { replace: true });
   };
 
   const handleToggleTopic = (month: string, topic: string) => {

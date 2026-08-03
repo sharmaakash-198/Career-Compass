@@ -181,8 +181,7 @@ export const Assessment: React.FC = () => {
       clearInterval(interval);
       setTimeout(() => {
         setLoading(false);
-        navigate('/dashboard');
-        window.location.reload();
+        navigate('/dashboard', { replace: true });
       }, 500);
     } catch (err) {
       clearInterval(interval);

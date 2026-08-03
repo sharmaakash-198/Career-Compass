@@ -29,8 +29,7 @@ export const Navbar: React.FC = () => {
 
   const handleSignOut = () => {
     localStorage.removeItem('user_session');
-    navigate('/');
-    window.location.reload();
+    navigate('/', { replace: true });
   };
 
   return (

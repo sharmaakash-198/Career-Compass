@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { getPostAuthPath } from '../utils/auth';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -13,8 +14,7 @@ export const Login: React.FC = () => {
       const namePrefix = email.split('@')[0];
       const displayName = namePrefix.charAt(0).toUpperCase() + namePrefix.slice(1);
       localStorage.setItem('user_session', JSON.stringify({ name: displayName, email }));
-      navigate('/dashboard');
-      window.location.reload();
+      navigate(getPostAuthPath(), { replace: true });
     }
   };
 

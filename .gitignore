@@ -40,3 +40,14 @@ frontend/flow.md
 
 .agents/
 tsconfig.json
+
+ai_implementation.md
+backend.md
+
+
+.cursor/
+
+mvp.md
+maven.md
+
+frontend/INFRASTRUCTURE.md
