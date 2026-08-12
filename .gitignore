@@ -16,8 +16,14 @@ dist-ssr
 
 # Environment files
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+
+# Java / Maven builds
+target/
+*.class
+*.jar
+*.war
 
 # Editor directories and files
 .vscode/*

@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.authentication.AuthProject.ai.client.NvidiaClientTest
--------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in com.authentication.AuthProject.ai.client.NvidiaClientTest
