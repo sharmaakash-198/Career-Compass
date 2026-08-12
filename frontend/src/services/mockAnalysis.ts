@@ -10,6 +10,33 @@ function getAuthHeaders(): HeadersInit {
   };
 }
 
+export async function getUserSkills(): Promise<string[]> {
+  const response = await fetch(`${BASE_URL}/skills`, {
+    method: 'GET',
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch skills');
+  }
+
+  return response.json();
+}
+
+export async function syncUserSkills(skills: string[]): Promise<string[]> {
+  const response = await fetch(`${BASE_URL}/skills`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ skills })
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to save skills');
+  }
+
+  return response.json();
+}
+
 export async function uploadResumeFile(file: File): Promise<string[]> {
   const token = localStorage.getItem('jwt_token');
   const formData = new FormData();

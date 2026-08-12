@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GraduationCap, X, AlertCircle, RefreshCw, UploadCloud, CheckCircle } from 'lucide-react';
 import { CAREER_ROLES } from '../data/roles';
-import { performAssessment, uploadResumeFile } from '../services/mockAnalysis';
+import { getUserSkills, performAssessment, syncUserSkills, uploadResumeFile } from '../services/mockAnalysis';
 import type { AssessmentData } from '../types';
 
 
@@ -37,6 +37,28 @@ export const Assessment: React.FC = () => {
     'Generating personalized projects and resources...'
   ];
 
+  useEffect(() => {
+    getUserSkills()
+      .then((skills) => {
+        if (skills.length > 0) {
+          setCurrentSkills(skills);
+        }
+      })
+      .catch(() => {
+        // Keep empty state if fetch fails (e.g. first visit)
+      });
+  }, []);
+
+  const persistSkills = async (skills: string[]) => {
+    try {
+      const saved = await syncUserSkills(skills);
+      setCurrentSkills(saved);
+      setError('');
+    } catch {
+      setError('Failed to save skills. Please try again.');
+    }
+  };
+
   // Handle adding skill tags
   const handleAddSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
@@ -47,9 +69,8 @@ export const Assessment: React.FC = () => {
           setError('Skill already added!');
           return;
         }
-        setCurrentSkills([...currentSkills, cleaned]);
+        void persistSkills([...currentSkills, cleaned]);
         setSkillInput('');
-        setError('');
       }
     }
   };
@@ -61,14 +82,13 @@ export const Assessment: React.FC = () => {
         setError('Skill already added!');
         return;
       }
-      setCurrentSkills([...currentSkills, cleaned]);
+      void persistSkills([...currentSkills, cleaned]);
       setSkillInput('');
-      setError('');
     }
   };
 
   const handleRemoveSkill = (skillToRemove: string) => {
-    setCurrentSkills(currentSkills.filter(s => s !== skillToRemove));
+    void persistSkills(currentSkills.filter(s => s !== skillToRemove));
   };
 
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,7 +105,8 @@ export const Assessment: React.FC = () => {
       setResumeLoading(false);
       if (matched.length > 0) {
         const merged = Array.from(new Set([...currentSkills, ...matched]));
-        setCurrentSkills(merged);
+        const saved = await syncUserSkills(merged);
+        setCurrentSkills(saved);
         setResumeMessage(`Extracted ${matched.length} skills from resume: ${matched.join(', ')}`);
       } else {
         setResumeMessage('Scan completed. No matching skills found in the text file.');
@@ -129,6 +150,9 @@ export const Assessment: React.FC = () => {
     };
 
     try {
+      const savedSkills = await syncUserSkills(currentSkills);
+      setCurrentSkills(savedSkills);
+
       const result = await performAssessment(assessmentInput);
       localStorage.setItem('cc_assessment_input', JSON.stringify(assessmentInput));
       localStorage.setItem('cc_assessment_result', JSON.stringify(result));
