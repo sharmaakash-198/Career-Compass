@@ -29,6 +29,7 @@ export const Navbar: React.FC = () => {
 
   const handleSignOut = () => {
     localStorage.removeItem('user_session');
+    localStorage.removeItem('jwt_token');
     navigate('/', { replace: true });
   };
 

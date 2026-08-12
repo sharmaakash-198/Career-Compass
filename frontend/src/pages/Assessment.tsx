@@ -2,21 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GraduationCap, X, AlertCircle, RefreshCw, UploadCloud, CheckCircle } from 'lucide-react';
 import { CAREER_ROLES } from '../data/roles';
-import { performAssessment } from '../services/mockAnalysis';
+import { performAssessment, uploadResumeFile } from '../services/mockAnalysis';
 import type { AssessmentData } from '../types';
 
-const ALL_KNOWN_SKILLS = [
-  'Java', 'Spring Boot', 'Node.js', 'Go', 'Docker', 'AWS', 'CI/CD', 
-  'System Design', 'PostgreSQL', 'Redis', 'Kubernetes', 'GraphQL', 'gRPC',
-  'React', 'TypeScript', 'Tailwind CSS', 'Next.js', 'Redux', 'Jest', 
-  'Webpack', 'Vite', 'HTML5', 'CSS3', 'Framer Motion', 'REST APIs',
-  'Express', 'MongoDB', 'Git', 'Python', 'PyTorch', 'TensorFlow', 
-  'Scikit-learn', 'LangChain', 'CUDA', 'Agentic AI', 'MCP', 'Hugging Face', 
-  'vector-databases', 'SQL', 'Pandas', 'NumPy', 'Tableau', 'R', 
-  'Statistics', 'Spark', 'Machine Learning', 'Data Visualisation', 
-  'Product Strategy', 'Agile Methodology', 'Jira', 'Data Analytics', 
-  'User Research', 'Wireframing', 'A/B Testing', 'Roadmapping'
-];
+
 
 export const Assessment: React.FC = () => {
   const navigate = useNavigate();
@@ -82,7 +71,7 @@ export const Assessment: React.FC = () => {
     setCurrentSkills(currentSkills.filter(s => s !== skillToRemove));
   };
 
-  const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -91,53 +80,19 @@ export const Assessment: React.FC = () => {
     setError('');
     setResumeMessage('Uploading and scanning resume...');
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const matched: string[] = [];
-
-      if (file.name.endsWith('.txt')) {
-        ALL_KNOWN_SKILLS.forEach(skill => {
-          const regex = new RegExp(`\\b${skill.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i');
-          if (regex.test(text)) {
-            matched.push(skill);
-          }
-        });
-      } else {
-        const presetSkills = ['React', 'TypeScript', 'Git', 'HTML5', 'CSS3', 'Node.js', 'SQL'];
-        const count = 4 + Math.floor(Math.random() * 3);
-        matched.push(...presetSkills.slice(0, count));
-      }
-
-      setTimeout(() => {
-        setResumeLoading(false);
-        if (matched.length > 0) {
-          const merged = Array.from(new Set([...currentSkills, ...matched]));
-          setCurrentSkills(merged);
-          setResumeMessage(`Extracted ${matched.length} skills from resume: ${matched.join(', ')}`);
-        } else {
-          setResumeMessage('Scan completed. No matching skills found in the text file.');
-        }
-      }, 1200);
-    };
-
-    reader.onerror = () => {
+    try {
+      const matched = await uploadResumeFile(file);
       setResumeLoading(false);
-      setError('Failed to read the file.');
-    };
-
-    if (file.name.endsWith('.txt')) {
-      reader.readAsText(file);
-    } else {
-      setTimeout(() => {
-        const presetSkills = ['React', 'TypeScript', 'Git', 'HTML5', 'CSS3', 'Node.js', 'SQL'];
-        const count = 4 + Math.floor(Math.random() * 3);
-        const matched = presetSkills.slice(0, count);
+      if (matched.length > 0) {
         const merged = Array.from(new Set([...currentSkills, ...matched]));
         setCurrentSkills(merged);
-        setResumeLoading(false);
-        setResumeMessage(`Extracted skills from ${file.name}: ${matched.join(', ')}`);
-      }, 1200);
+        setResumeMessage(`Extracted ${matched.length} skills from resume: ${matched.join(', ')}`);
+      } else {
+        setResumeMessage('Scan completed. No matching skills found in the text file.');
+      }
+    } catch (err: any) {
+      setResumeLoading(false);
+      setError(err.message || 'Failed to upload and scan resume.');
     }
   };
 

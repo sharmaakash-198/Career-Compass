@@ -7,6 +7,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Trends } from './pages/Trends';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { VerifyOtp } from './pages/VerifyOtp';
 import { NotFound } from './pages/NotFound';
 import { CompanyTrends } from './pages/CompanyTrends';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -28,6 +29,7 @@ const App: React.FC = () => {
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/verify-otp" element={<VerifyOtp />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>

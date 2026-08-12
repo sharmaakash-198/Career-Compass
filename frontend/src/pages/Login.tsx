@@ -6,21 +6,96 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) {
-      // Save mock session details
-      const namePrefix = email.split('@')[0];
-      const displayName = namePrefix.charAt(0).toUpperCase() + namePrefix.slice(1);
-      localStorage.setItem('user_session', JSON.stringify({ name: displayName, email }));
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:8080/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          // Unverified user exception
+          setError('Email not verified. Redirecting to verification page...');
+          setTimeout(() => {
+            navigate(`/verify-otp?email=${encodeURIComponent(email)}`, { replace: true });
+          }, 2000);
+        } else {
+          setError(data.message || 'Invalid email or password.');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Successful login: store JWT token
+      const token = data.token;
+      const userId = data.userId;
+      localStorage.setItem('jwt_token', token);
+
+      // Fetch user profile info
+      const profileResponse = await fetch(`http://localhost:8080/api/users/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!profileResponse.ok) {
+        setError('Failed to fetch user profile. Please try again.');
+        localStorage.removeItem('jwt_token');
+        setLoading(false);
+        return;
+      }
+
+      const profileData = await profileResponse.json();
+      
+      // Save user session details
+      localStorage.setItem(
+        'user_session',
+        JSON.stringify({
+          id: profileData.id,
+          name: profileData.fullName,
+          email: profileData.email,
+        })
+      );
+
       navigate(getPostAuthPath(), { replace: true });
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Network error. Please make sure the backend is running.');
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto mt-20 p-8 border border-border bg-surface rounded">
+    <div className="max-w-md mx-auto mt-20 p-8 border border-border bg-surface rounded shadow-sm">
       <h2 className="text-2xl font-bold text-primary mb-6">Login</h2>
+      
+      {error && (
+        <div
+          className={`mb-4 p-3 rounded text-sm border ${
+            error.includes('Redirecting')
+              ? 'bg-amber-50 border-amber-200 text-amber-700'
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}
+        >
+          {error}
+        </div>
+      )}
+
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
           <label className="block text-sm font-semibold mb-1 text-primary">Email address</label>
@@ -30,6 +105,7 @@ export const Login: React.FC = () => {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-3 py-2 border border-border rounded bg-white text-primary text-sm focus:outline-none focus:border-primary"
             required
+            disabled={loading}
           />
         </div>
         <div>
@@ -40,13 +116,17 @@ export const Login: React.FC = () => {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-3 py-2 border border-border rounded bg-white text-primary text-sm focus:outline-none focus:border-primary"
             required
+            disabled={loading}
           />
         </div>
         <button
           type="submit"
-          className="w-full py-2 bg-primary text-white font-semibold rounded hover:bg-slate-800 transition-colors text-sm"
+          disabled={loading}
+          className={`w-full py-2 bg-primary text-white font-semibold rounded hover:bg-slate-800 transition-colors text-sm ${
+            loading ? 'opacity-70 cursor-not-allowed' : ''
+          }`}
         >
-          Sign In
+          {loading ? 'Logging In...' : 'Sign In'}
         </button>
       </form>
       <p className="mt-4 text-xs text-center text-slate-500">

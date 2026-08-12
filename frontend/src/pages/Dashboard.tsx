@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ChevronRight, RotateCcw, Target, ShieldCheck, Trophy, Sparkles, CheckCircle2, X } from 'lucide-react';
 import { SkillGapCard } from '../components/SkillGapCard';
-import { RoadmapTimeline } from '../components/RoadmapTimeline';
+import { RoadmapTimeline, parseTopicItem } from '../components/RoadmapTimeline';
 import { ProjectCard } from '../components/ProjectCard';
 import { ResourceCard } from '../components/ResourceCard';
 import type { AnalysisResult, AssessmentData } from '../types';
 import { CAREER_ROLES } from '../data/roles';
+import { getLatestAssessment } from '../services/mockAnalysis';
 
 interface Recommendation {
   id: string;
@@ -136,17 +137,43 @@ export const Dashboard: React.FC = () => {
   const [showRecommendationsFlyout, setShowRecommendationsFlyout] = useState(false);
 
   useEffect(() => {
-    const rawInput = localStorage.getItem('cc_assessment_input');
-    const rawResult = localStorage.getItem('cc_assessment_result');
+    async function loadLatestAssessment() {
+      try {
+        const latest = await getLatestAssessment();
+        if (latest) {
+          setResult(latest);
+          
+          const rawInput = localStorage.getItem('cc_assessment_input');
+          if (rawInput) {
+            setAssessmentInput(JSON.parse(rawInput));
+          } else {
+            // Reconstruct from result
+            setAssessmentInput({
+              currentRole: "Your Profile",
+              currentSkills: [],
+              targetRole: "backend"
+            });
+          }
+        } else {
+          const rawInput = localStorage.getItem('cc_assessment_input');
+          const rawResult = localStorage.getItem('cc_assessment_result');
+          if (rawInput && rawResult) {
+            setAssessmentInput(JSON.parse(rawInput));
+            setResult(JSON.parse(rawResult));
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    
+    loadLatestAssessment();
+
     const rawCompleted = localStorage.getItem('cc_completed_topics');
     const rawProjects = localStorage.getItem('cc_completed_projects');
     const rawResources = localStorage.getItem('cc_completed_resources');
     const rawApplied = localStorage.getItem('cc_applied_recommendations');
 
-    if (rawInput && rawResult) {
-      setAssessmentInput(JSON.parse(rawInput));
-      setResult(JSON.parse(rawResult));
-    }
     if (rawCompleted) {
       setCompletedTopics(JSON.parse(rawCompleted));
     }
@@ -331,12 +358,16 @@ export const Dashboard: React.FC = () => {
 
   const classification = getScoreClassification(result.marketFitScore);
 
-  // Progress metrics calculation
-  const totalRoadmapTopics = result.roadmap.reduce((acc, curr) => acc + curr.topics.length, 0);
+  // Progress metrics calculation matching precise RoadmapTimeline parsed line cards
+  const totalRoadmapTopics = result.roadmap.reduce((acc, curr) => {
+    return acc + curr.topics.flatMap(t => parseTopicItem(t)).length;
+  }, 0);
+
   const totalCompletedTopics = completedTopics.filter(topicKey => {
-    return result.roadmap.some(item =>
-      item.topics.some(topic => `${item.month} - ${topic}` === topicKey)
-    );
+    return result.roadmap.some(item => {
+      const parsed = item.topics.flatMap(t => parseTopicItem(t));
+      return parsed.some(pt => topicKey === `${item.month} - ${pt.rawString}` || topicKey === `${item.month} - ${pt.title}`);
+    });
   }).length;
 
   const roadmapProgressPercentage = totalRoadmapTopics > 0
@@ -578,7 +609,7 @@ export const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="overflow-y-auto max-h-[480px] pr-1">
+          <div className="w-full">
             <RoadmapTimeline
               roadmap={result.roadmap}
               completedTopics={completedTopics}
@@ -588,12 +619,17 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Recommended Projects (right 1 col) */}
-        <div className="w-full space-y-3">
-          <div className="border-b border-border pb-2">
-            <h4 className="text-sm font-bold text-primary">Recommended Projects</h4>
-            <p className="text-[10px] text-text">Practice exercises to construct a verified portfolio.</p>
+        <div className="w-full lg:sticky lg:top-6 space-y-3.5">
+          <div className="border-b border-border pb-2 flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-bold text-primary">Recommended Projects</h4>
+              <p className="text-[10px] text-text">Practice exercises to construct a verified portfolio.</p>
+            </div>
+            <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/10">
+              {result.projects.filter(p => completedProjects.includes(p.name)).length}/{result.projects.length} Done
+            </span>
           </div>
-          <div className="grid w-full grid-cols-1 gap-3">
+          <div className="grid w-full grid-cols-1 gap-3.5">
             {result.projects.map((proj, idx) => (
               <ProjectCard
                 key={idx}

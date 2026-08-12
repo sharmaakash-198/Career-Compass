@@ -18,15 +18,22 @@ export interface CareerRole {
   requiredSkills: string[];
 }
 
+export interface RoadmapTopic {
+  title: string;
+  description?: string;
+  category?: 'Core' | 'Tooling' | 'Practice' | 'Architecture' | 'General';
+}
+
 export interface RoadmapItem {
   month: string;
-  topics: string[];
+  topics: (string | RoadmapTopic)[];
 }
 
 export interface RecommendedProject {
   name: string;
   skillsLearned: string[];
   duration: string;
+  description?: string;
 }
 
 export interface LearningResource {

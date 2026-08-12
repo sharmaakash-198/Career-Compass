@@ -26,17 +26,32 @@ export const ROLE_ROADMAPS: Record<string, RoleRoadmap> = {
       {
         name: 'URL Shortener Service',
         skillsLearned: ['Go/Node.js', 'Redis', 'PostgreSQL', 'Docker'],
-        duration: '2 weeks'
+        duration: '2 weeks',
+        description: 'Build a high-performance URL shortener with custom alias generation, rate limiting, and Redis analytics tracking.'
       },
       {
         name: 'Distributed In-Memory Cache',
         skillsLearned: ['Go', 'TCP/UDP Networking', 'Concurrency', 'Mutexes'],
-        duration: '3 weeks'
+        duration: '3 weeks',
+        description: 'Implement a peer-to-peer distributed cache engine using TCP socket communication, LRU eviction, and thread safety.'
       },
       {
         name: 'AI Resume Analyzer API',
         skillsLearned: ['Python', 'LangChain', 'OpenAI API', 'Docker'],
-        duration: '2 weeks'
+        duration: '2 weeks',
+        description: 'Design a REST API service that parses PDF resumes, extracts key skills, and performs semantic gap analysis.'
+      },
+      {
+        name: 'Event-Driven Order Processing Engine',
+        skillsLearned: ['Java/Spring Boot', 'Kafka', 'RabbitMQ', 'PostgreSQL'],
+        duration: '3 weeks',
+        description: 'Construct an async event-driven checkout pipeline utilizing message queues for payment processing and stock updates.'
+      },
+      {
+        name: 'API Gateway & Rate Limiter',
+        skillsLearned: ['Node.js', 'Redis Token Bucket', 'JWT Auth', 'Nginx'],
+        duration: '2 weeks',
+        description: 'Develop a reverse proxy API Gateway implementing dynamic rate limiting, authentication verification, and route routing.'
       }
     ],
     resources: [
@@ -79,17 +94,32 @@ export const ROLE_ROADMAPS: Record<string, RoleRoadmap> = {
       {
         name: 'SaaS Analytics Dashboard',
         skillsLearned: ['React', 'TypeScript', 'Tailwind CSS', 'Recharts'],
-        duration: '1 week'
+        duration: '1 week',
+        description: 'Interactive analytics dashboard featuring real-time data visualisations, dark mode themes, and filterable data tables.'
       },
       {
         name: 'Collaborative Docs Editor',
         skillsLearned: ['Next.js', 'WebSockets', 'Yjs CRDTs', 'Tailwind'],
-        duration: '3 weeks'
+        duration: '3 weeks',
+        description: 'Multi-user real-time document editor supporting concurrent editing cursor presence and rich text formatting.'
       },
       {
         name: 'Interactive Component Library',
         skillsLearned: ['React', 'TypeScript', 'Storybook', 'Tailwind CSS'],
-        duration: '2 weeks'
+        duration: '2 weeks',
+        description: 'Publishable UI component design system documented in Storybook with full keyboard accessibility and theme customization.'
+      },
+      {
+        name: 'E-Commerce Storefront with Next.js',
+        skillsLearned: ['Next.js App Router', 'Stripe API', 'Zustand', 'Tailwind'],
+        duration: '2 weeks',
+        description: 'Lightning-fast server-rendered e-commerce platform with cart management, search filtering, and secure Stripe checkout.'
+      },
+      {
+        name: 'Kanban Task Board with Drag & Drop',
+        skillsLearned: ['React', 'dnd-kit', 'TypeScript', 'LocalStorage'],
+        duration: '1 week',
+        description: 'Trello-style drag-and-drop project management board with custom columns, task labels, and optimistic updates.'
       }
     ],
     resources: [
@@ -132,17 +162,32 @@ export const ROLE_ROADMAPS: Record<string, RoleRoadmap> = {
       {
         name: 'E-commerce Platform',
         skillsLearned: ['MERN Stack', 'Stripe Payments', 'Redux Toolkit', 'Tailwind'],
-        duration: '3 weeks'
+        duration: '3 weeks',
+        description: 'Full-stack marketplace with user authentication, product catalog, shopping cart, and Stripe payment gateway.'
       },
       {
         name: 'Real-time Chat Application',
         skillsLearned: ['Node.js', 'Socket.io', 'React', 'MongoDB'],
-        duration: '2 weeks'
+        duration: '2 weeks',
+        description: 'Real-time messaging platform supporting direct messages, group chat rooms, image attachments, and typing status.'
       },
       {
         name: 'AI-Powered Job Board',
         skillsLearned: ['Next.js', 'Prisma', 'PostgreSQL', 'Gemini API'],
-        duration: '3 weeks'
+        duration: '3 weeks',
+        description: 'Recruitment portal featuring AI resume matching score calculation, applicant tracking, and automated candidate summaries.'
+      },
+      {
+        name: 'DevOps Automated Deployment Portal',
+        skillsLearned: ['React', 'Node.js', 'Docker API', 'AWS S3'],
+        duration: '2 weeks',
+        description: 'Web portal for developers to deploy containerized web services, monitor health logs, and view server metrics.'
+      },
+      {
+        name: 'Social Content Media Platform',
+        skillsLearned: ['Next.js', 'GraphQL', 'PostgreSQL', 'Redis'],
+        duration: '3 weeks',
+        description: 'Full-featured social network with post creation, media upload, upvoting algorithms, nested comments, and user profiles.'
       }
     ],
     resources: [
@@ -185,17 +230,32 @@ export const ROLE_ROADMAPS: Record<string, RoleRoadmap> = {
       {
         name: 'RAG Knowledge Assistant',
         skillsLearned: ['Python', 'LangChain', 'Qdrant Vector DB', 'OpenAI'],
-        duration: '2 weeks'
+        duration: '2 weeks',
+        description: 'Question-answering assistant over custom enterprise documents built with semantic vector embeddings and LLM reranking.'
       },
       {
         name: 'Autonomous AI Agent Workflow',
         skillsLearned: ['Python', 'CrewAI/LangGraph', 'MCP tools', 'SQLite'],
-        duration: '3 weeks'
+        duration: '3 weeks',
+        description: 'Multi-agent orchestration pipeline performing automated web research, content drafting, and code generation.'
       },
       {
         name: 'Real-time Object Detection API',
         skillsLearned: ['Python', 'PyTorch', 'YOLOv8', 'FastAPI'],
-        duration: '2 weeks'
+        duration: '2 weeks',
+        description: 'Computer vision REST service detecting objects in live video streams with bounding box visualisations.'
+      },
+      {
+        name: 'Fine-Tuned Domain LLM Evaluator',
+        skillsLearned: ['Python', 'HuggingFace PEFT/LoRA', 'MLflow', 'CUDA'],
+        duration: '3 weeks',
+        description: 'Fine-tune an open-source LLM (Llama 3 / Mistral) on domain-specific datasets and measure perplexity and accuracy.'
+      },
+      {
+        name: 'AI Code Assistant & Linter',
+        skillsLearned: ['Python', 'Tree-Sitter', 'FastAPI', 'Vector Search'],
+        duration: '2 weeks',
+        description: 'Code intelligence extension tool providing automated code refactoring, bug detection, and documentation generation.'
       }
     ],
     resources: [
@@ -238,17 +298,32 @@ export const ROLE_ROADMAPS: Record<string, RoleRoadmap> = {
       {
         name: 'Customer Churn Predictor',
         skillsLearned: ['Python', 'Scikit-learn', 'Pandas', 'Matplotlib'],
-        duration: '2 weeks'
+        duration: '2 weeks',
+        description: 'Predictive classification model identifying customer churn risks using XGBoost and SHAP feature importance visualisations.'
       },
       {
         name: 'Sales Forecasting Dashboard',
         skillsLearned: ['Python', 'Prophet', 'Streamlit', 'SQL'],
-        duration: '2 weeks'
+        duration: '2 weeks',
+        description: 'Time-series forecasting web application predicting quarterly revenue trends with confidence intervals.'
       },
       {
         name: 'Logistics Network Optimization',
         skillsLearned: ['Python', 'SciPy', 'PuLP', 'Tableau'],
-        duration: '3 weeks'
+        duration: '3 weeks',
+        description: 'Linear programming optimization model reducing supply chain transport costs across warehouse distribution hubs.'
+      },
+      {
+        name: 'Fraud Detection Analytics Engine',
+        skillsLearned: ['PySpark', 'SQL', 'Imbalanced-Learn', 'PowerBI'],
+        duration: '2 weeks',
+        description: 'Big data anomaly detection pipeline identifying credit card transaction fraud patterns in large stream datasets.'
+      },
+      {
+        name: 'A/B Test Experimentation Toolkit',
+        skillsLearned: ['Python', 'SciPy Stats', 'Streamlit', 'Pandas'],
+        duration: '1 week',
+        description: 'Statistical analysis tool calculating sample sizes, p-values, confidence bounds, and minimum detectable effects.'
       }
     ],
     resources: [
@@ -291,12 +366,32 @@ export const ROLE_ROADMAPS: Record<string, RoleRoadmap> = {
       {
         name: 'Product Spec & PRD document',
         skillsLearned: ['Product Specs', 'Figma Wireframing', 'Market Sizing'],
-        duration: '1 week'
+        duration: '1 week',
+        description: 'Comprehensive Product Requirement Document defining feature scope, user personas, wireframes, and launch KPIs.'
       },
       {
         name: 'Mobile App Feature Redesign',
         skillsLearned: ['User Research', 'A/B Test Design', 'Amplitude Analytics'],
-        duration: '2 weeks'
+        duration: '2 weeks',
+        description: 'UX wireframing redesign targeting onboarding drop-offs, backed by quantitative retention cohort data analysis.'
+      },
+      {
+        name: 'SaaS Pricing & Packaging Strategy',
+        skillsLearned: ['Pricing Strategy', 'Conjoint Analysis', 'Financial Modeling'],
+        duration: '2 weeks',
+        description: 'Formulate tiered subscription pricing plans based on customer value metrics, willingness-to-pay research, and ARR forecasts.'
+      },
+      {
+        name: 'Product Launch GTM Roadmap',
+        skillsLearned: ['GTM Strategy', 'Competitive Analysis', 'User Stories'],
+        duration: '2 weeks',
+        description: 'Create a Go-To-Market strategy detailing positioning, launch channels, sales enablement collateral, and success metrics.'
+      },
+      {
+        name: 'Customer Funnel Conversion Audit',
+        skillsLearned: ['Mixpanel', 'Google Analytics', 'SQL', 'Conversion Rate Optimization'],
+        duration: '1 week',
+        description: 'Perform funnel conversion audit identifying user drop-off bottlenecks and proposing prioritized backlog experiments.'
       }
     ],
     resources: [
