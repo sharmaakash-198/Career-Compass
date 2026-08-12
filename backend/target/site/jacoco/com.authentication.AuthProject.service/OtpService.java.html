@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OtpService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report"></a> &gt; <a href="index.source.html" class="el_package">com.authentication.AuthProject.service</a> &gt; <span class="el_source">OtpService.java</span></div><h1>OtpService.java</h1><pre class="source lang-java linenums">package com.authentication.AuthProject.service;
+
+import com.authentication.AuthProject.entity.User;
+import com.authentication.AuthProject.exception.BadRequestException;
+import com.authentication.AuthProject.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.security.SecureRandom;
+
+// Generates, stores, verifies, and resends email OTP codes via Memcached.
+ 
+<span class="fc" id="L15">@Slf4j</span>
+@RequiredArgsConstructor
+@Service
+public class OtpService {
+
+    private static final int OTP_LENGTH = 6;
+    private static final int OTP_TTL_SECONDS = 300;
+    private static final int MAX_ATTEMPTS = 3;
+    private static final int ATTEMPT_TTL_SECONDS = OTP_TTL_SECONDS;
+
+    private static final String OTP_KEY_PREFIX = &quot;otp:&quot;;
+    private static final String ATTEMPT_KEY_PREFIX = &quot;otp:attempts:&quot;;
+
+<span class="fc" id="L28">    private static final SecureRandom SECURE_RANDOM = new SecureRandom();</span>
+
+    private final MemcachedService memcachedService;
+    private final OtpDeliveryService otpDeliveryService;
+    private final UserRepository userRepository;
+
+
+    public void issueOtpForSignup(String email) {
+<span class="fc" id="L36">        String normalizedEmail = normalizeEmail(email);</span>
+<span class="fc" id="L37">        User user = userRepository.findByEmail(normalizedEmail)</span>
+<span class="pc" id="L38">                .orElseThrow(() -&gt; new BadRequestException(&quot;User not found for OTP issuance.&quot;));</span>
+
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (user.isVerified()) {</span>
+<span class="fc" id="L41">            throw new BadRequestException(&quot;Email is already verified.&quot;);</span>
+        }
+
+<span class="fc" id="L44">        storeNewOtp(normalizedEmail);</span>
+<span class="fc" id="L45">    }</span>
+
+
+
+    @Transactional
+    public void verifyOtp(String email, String otp) {
+<span class="fc" id="L51">        String normalizedEmail = normalizeEmail(email);</span>
+<span class="fc" id="L52">        int attempts = getAttemptCount(normalizedEmail);</span>
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (attempts &gt;= MAX_ATTEMPTS) {</span>
+<span class="fc" id="L55">            throw new BadRequestException(&quot;Maximum OTP verification attempts exceeded.&quot;);</span>
+        }
+
+<span class="fc" id="L58">        String otpKey = otpKey(normalizedEmail);</span>
+<span class="fc" id="L59">        String storedOtp = memcachedService.get(otpKey);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (storedOtp == null) {</span>
+<span class="nc" id="L61">            throw new BadRequestException(&quot;OTP expired or not found. Please request a new one.&quot;);</span>
+        }
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (!storedOtp.equals(otp)) {</span>
+<span class="fc" id="L65">            incrementAttempts(normalizedEmail);</span>
+<span class="fc" id="L66">            log.warn(&quot;Failed OTP verification attempt for email: {}&quot;, normalizedEmail);</span>
+<span class="fc" id="L67">            throw new BadRequestException(&quot;Invalid OTP.&quot;);</span>
+        }
+
+<span class="fc" id="L70">        User user = userRepository.findByEmail(normalizedEmail)</span>
+<span class="pc" id="L71">                .orElseThrow(() -&gt; new BadRequestException(&quot;User not found.&quot;));</span>
+<span class="fc" id="L72">        user.setVerified(true);</span>
+<span class="fc" id="L73">        userRepository.save(user);</span>
+
+<span class="fc" id="L75">        memcachedService.delete(otpKey);</span>
+<span class="fc" id="L76">        memcachedService.delete(attemptsKey(normalizedEmail));</span>
+<span class="fc" id="L77">        log.info(&quot;Email verified successfully for: {}&quot;, normalizedEmail);</span>
+<span class="fc" id="L78">    }</span>
+
+
+
+
+    public void resendOtp(String email) {
+<span class="fc" id="L84">        String normalizedEmail = normalizeEmail(email);</span>
+<span class="fc" id="L85">        User user = userRepository.findByEmail(normalizedEmail)</span>
+<span class="fc" id="L86">                .orElseThrow(() -&gt; new BadRequestException(&quot;User not found.&quot;));</span>
+
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (user.isVerified()) {</span>
+<span class="nc" id="L89">            throw new BadRequestException(&quot;Email is already verified.&quot;);</span>
+        }
+
+<span class="fc" id="L92">        memcachedService.delete(otpKey(normalizedEmail));</span>
+<span class="fc" id="L93">        memcachedService.delete(attemptsKey(normalizedEmail));</span>
+<span class="fc" id="L94">        storeNewOtp(normalizedEmail);</span>
+<span class="fc" id="L95">        log.info(&quot;OTP resent for email: {}&quot;, normalizedEmail);</span>
+<span class="fc" id="L96">    }</span>
+
+
+
+
+    private void storeNewOtp(String normalizedEmail) {
+<span class="fc" id="L102">        String otp = generateOtp();</span>
+<span class="fc" id="L103">        memcachedService.set(otpKey(normalizedEmail), OTP_TTL_SECONDS, otp);</span>
+<span class="fc" id="L104">        memcachedService.set(attemptsKey(normalizedEmail), ATTEMPT_TTL_SECONDS, &quot;0&quot;);</span>
+<span class="fc" id="L105">        otpDeliveryService.sendOtp(otp, normalizedEmail);</span>
+<span class="fc" id="L106">        log.debug(&quot;Stored new OTP for email: {}&quot;, normalizedEmail);</span>
+<span class="fc" id="L107">    }</span>
+
+
+
+    private void incrementAttempts(String normalizedEmail) {
+<span class="fc" id="L112">        int attempts = getAttemptCount(normalizedEmail) + 1;</span>
+<span class="fc" id="L113">        memcachedService.set(attemptsKey(normalizedEmail), ATTEMPT_TTL_SECONDS, String.valueOf(attempts));</span>
+<span class="fc" id="L114">    }</span>
+
+
+
+
+    private int getAttemptCount(String normalizedEmail) {
+<span class="fc" id="L120">        String attempts = memcachedService.get(attemptsKey(normalizedEmail));</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (attempts == null) {</span>
+<span class="nc" id="L122">            return 0;</span>
+        }
+        try {
+<span class="fc" id="L125">            return Integer.parseInt(attempts);</span>
+<span class="nc" id="L126">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L127">            log.warn(&quot;Invalid attempt counter for email: {}&quot;, normalizedEmail);</span>
+<span class="nc" id="L128">            return 0;</span>
+        }
+    }
+
+
+
+
+    private String generateOtp() {
+<span class="fc" id="L136">        int value = SECURE_RANDOM.nextInt(1_000_000);</span>
+<span class="fc" id="L137">        return String.format(&quot;%06d&quot;, value);</span>
+    }
+
+
+    private String normalizeEmail(String email) {
+<span class="fc" id="L142">        return email.trim().toLowerCase();</span>
+    }
+
+    private String otpKey(String normalizedEmail) {
+<span class="fc" id="L146">        return OTP_KEY_PREFIX + normalizedEmail;</span>
+    }
+
+    private String attemptsKey(String normalizedEmail) {
+<span class="fc" id="L150">        return ATTEMPT_KEY_PREFIX + normalizedEmail;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

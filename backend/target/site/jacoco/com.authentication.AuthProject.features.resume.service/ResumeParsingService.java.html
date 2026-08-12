@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResumeParsingService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report"></a> &gt; <a href="index.source.html" class="el_package">com.authentication.AuthProject.features.resume.service</a> &gt; <span class="el_source">ResumeParsingService.java</span></div><h1>ResumeParsingService.java</h1><pre class="source lang-java linenums">package com.authentication.AuthProject.features.resume.service;
+
+import com.authentication.AuthProject.features.user.entity.User;
+import com.authentication.AuthProject.features.resume.entity.UserResume;
+import com.authentication.AuthProject.features.resume.repository.UserResumeRepository;
+import com.authentication.AuthProject.features.skill.entity.UserSkill;
+import com.authentication.AuthProject.features.skill.repository.UserSkillRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Pattern;
+
+@Service
+@RequiredArgsConstructor
+<span class="nc" id="L22">@Slf4j</span>
+public class ResumeParsingService {
+
+<span class="nc" id="L25">    private static final List&lt;String&gt; ALL_KNOWN_SKILLS = Arrays.asList(</span>
+            &quot;Java&quot;, &quot;Spring Boot&quot;, &quot;Node.js&quot;, &quot;Go&quot;, &quot;Docker&quot;, &quot;AWS&quot;, &quot;CI/CD&quot;,
+            &quot;System Design&quot;, &quot;PostgreSQL&quot;, &quot;Redis&quot;, &quot;Kubernetes&quot;, &quot;GraphQL&quot;, &quot;gRPC&quot;,
+            &quot;React&quot;, &quot;TypeScript&quot;, &quot;Tailwind CSS&quot;, &quot;Next.js&quot;, &quot;Redux&quot;, &quot;Jest&quot;,
+            &quot;Webpack&quot;, &quot;Vite&quot;, &quot;HTML5&quot;, &quot;CSS3&quot;, &quot;Framer Motion&quot;, &quot;REST APIs&quot;,
+            &quot;Express&quot;, &quot;MongoDB&quot;, &quot;Git&quot;, &quot;Python&quot;, &quot;PyTorch&quot;, &quot;TensorFlow&quot;,
+            &quot;Scikit-learn&quot;, &quot;LangChain&quot;, &quot;CUDA&quot;, &quot;Agentic AI&quot;, &quot;MCP&quot;, &quot;Hugging Face&quot;,
+            &quot;vector-databases&quot;, &quot;SQL&quot;, &quot;Pandas&quot;, &quot;NumPy&quot;, &quot;Tableau&quot;, &quot;R&quot;,
+            &quot;Statistics&quot;, &quot;Spark&quot;, &quot;Machine Learning&quot;, &quot;Data Visualisation&quot;,
+            &quot;Product Strategy&quot;, &quot;Agile Methodology&quot;, &quot;Jira&quot;, &quot;Data Analytics&quot;,
+            &quot;User Research&quot;, &quot;Wireframing&quot;, &quot;A/B Testing&quot;, &quot;Roadmapping&quot;
+    );
+
+    private final ResumeTextExtractor textExtractor;
+    private final UserResumeRepository userResumeRepository;
+    private final UserSkillRepository userSkillRepository;
+
+    @Transactional
+    public List&lt;String&gt; processResumeUpload(User user, MultipartFile file) throws Exception {
+<span class="nc" id="L44">        String extractedText = textExtractor.extract(file);</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (extractedText.isBlank()) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;No text could be extracted from the resume&quot;);</span>
+        }
+
+<span class="nc" id="L49">        UserResume resume = new UserResume();</span>
+<span class="nc" id="L50">        resume.setUser(user);</span>
+<span class="nc" id="L51">        resume.setFileName(file.getOriginalFilename());</span>
+<span class="nc" id="L52">        resume.setFileSize(file.getSize());</span>
+<span class="nc" id="L53">        resume.setRawText(extractedText);</span>
+<span class="nc" id="L54">        resume.setUploadedAt(Instant.now());</span>
+<span class="nc" id="L55">        userResumeRepository.save(resume);</span>
+
+<span class="nc" id="L57">        List&lt;String&gt; matchedSkills = matchSkills(extractedText);</span>
+<span class="nc" id="L58">        persistNewSkills(user, matchedSkills);</span>
+<span class="nc" id="L59">        log.info(&quot;Successfully extracted {} skills from resume and persisted.&quot;, matchedSkills.size());</span>
+<span class="nc" id="L60">        return matchedSkills;</span>
+    }
+
+    private List&lt;String&gt; matchSkills(String text) {
+<span class="nc" id="L64">        List&lt;String&gt; matched = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        for (String skill : ALL_KNOWN_SKILLS) {</span>
+<span class="nc" id="L66">            Pattern pattern = Pattern.compile(&quot;\\b&quot; + Pattern.quote(skill) + &quot;\\b&quot;, Pattern.CASE_INSENSITIVE);</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            if (pattern.matcher(text).find()) {</span>
+<span class="nc" id="L68">                matched.add(skill);</span>
+            }
+<span class="nc" id="L70">        }</span>
+<span class="nc" id="L71">        return matched;</span>
+    }
+
+    private void persistNewSkills(User user, List&lt;String&gt; skills) {
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        for (String skillName : skills) {</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            if (userSkillRepository.findByUserIdAndSkillNameIgnoreCase(user.getId(), skillName).isEmpty()) {</span>
+<span class="nc" id="L77">                UserSkill userSkill = new UserSkill();</span>
+<span class="nc" id="L78">                userSkill.setUser(user);</span>
+<span class="nc" id="L79">                userSkill.setSkillName(skillName);</span>
+<span class="nc" id="L80">                userSkill.setSource(&quot;RESUME&quot;);</span>
+<span class="nc" id="L81">                userSkill.setCreatedAt(Instant.now());</span>
+<span class="nc" id="L82">                userSkillRepository.save(userSkill);</span>
+            }
+<span class="nc" id="L84">        }</span>
+<span class="nc" id="L85">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

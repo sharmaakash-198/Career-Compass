@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PromptBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report"></a> &gt; <a href="index.source.html" class="el_package">com.authentication.AuthProject.ai.prompt</a> &gt; <span class="el_source">PromptBuilder.java</span></div><h1>PromptBuilder.java</h1><pre class="source lang-java linenums">package com.authentication.AuthProject.ai.prompt;
+
+import com.authentication.AuthProject.resource.entity.Resource;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+<span class="nc" id="L9">public class PromptBuilder {</span>
+
+    public String buildSystemPrompt() {
+<span class="nc" id="L12">        return &quot;You are an expert Career Mentor and AI Career Intelligence Agent.\n&quot; +</span>
+                &quot;Your task is to analyze the user's current profile, skills, and target career role, compare them against industry standards, and recommend learning resources from the provided list.\n\n&quot; +
+                &quot;CRITICAL: You MUST respond with ONLY a valid, single JSON object containing the exact structure below. Do NOT add any conversational explanation, markdown formatting (like ```json ... ```), or notes. The response must be a parseable raw JSON string.\n\n&quot; +
+                &quot;JSON Output Schema:\n&quot; +
+                &quot;{\n&quot; +
+                &quot;  \&quot;score\&quot;: 75, // Market alignment/fit percentage score (integer between 0 and 100)\n&quot; +
+                &quot;  \&quot;strengths\&quot;: [\&quot;string\&quot;], // List of user's key strengths (up to 3)\n&quot; +
+                &quot;  \&quot;weaknesses\&quot;: [\&quot;string\&quot;], // List of user's core gaps/weaknesses (up to 3)\n&quot; +
+                &quot;  \&quot;missingSkills\&quot;: [\&quot;string\&quot;], // Specific technical skills needed for target role\n&quot; +
+                &quot;  \&quot;roadmap\&quot;: [\n&quot; +
+                &quot;    {\n&quot; +
+                &quot;      \&quot;monthLabel\&quot;: \&quot;Month 1\&quot;, // Label indicating period\n&quot; +
+                &quot;      \&quot;topicName\&quot;: \&quot;Topic Name\&quot;, // Main topic of study\n&quot; +
+                &quot;      \&quot;description\&quot;: \&quot;Detailed description of what to learn.\&quot;\n&quot; +
+                &quot;    }\n&quot; +
+                &quot;  ],\n&quot; +
+                &quot;  \&quot;recommendedResources\&quot;: [\n&quot; +
+                &quot;    {\n&quot; +
+                &quot;      \&quot;title\&quot;: \&quot;Title matching one of the provided resources\&quot;,\n&quot; +
+                &quot;      \&quot;description\&quot;: \&quot;Brief description\&quot;,\n&quot; +
+                &quot;      \&quot;url\&quot;: \&quot;Exact URL from the provided resource list\&quot;,\n&quot; +
+                &quot;      \&quot;source\&quot;: \&quot;Source from provided list\&quot;,\n&quot; +
+                &quot;      \&quot;category\&quot;: \&quot;Category from list\&quot;,\n&quot; +
+                &quot;      \&quot;difficulty\&quot;: \&quot;Difficulty from list\&quot;,\n&quot; +
+                &quot;      \&quot;estimatedLearningTime\&quot;: \&quot;Estimated learning time\&quot;,\n&quot; +
+                &quot;      \&quot;skills\&quot;: [\&quot;associated skills\&quot;],\n&quot; +
+                &quot;      \&quot;tags\&quot;: [\&quot;associated tags\&quot;]\n&quot; +
+                &quot;    }\n&quot; +
+                &quot;  ],\n&quot; +
+                &quot;  \&quot;recommendedProjects\&quot;: [\n&quot; +
+                &quot;    {\n&quot; +
+                &quot;      \&quot;title\&quot;: \&quot;Project Title\&quot;,\n&quot; +
+                &quot;      \&quot;description\&quot;: \&quot;Description of a highly relevant portfolio project that can bridge gaps.\&quot;,\n&quot; +
+                &quot;      \&quot;difficulty\&quot;: \&quot;Beginner/Intermediate/Advanced\&quot;,\n&quot; +
+                &quot;      \&quot;duration\&quot;: \&quot;Estimated duration e.g. 2 weeks\&quot;\n&quot; +
+                &quot;    }\n&quot; +
+                &quot;  ],\n&quot; +
+                &quot;  \&quot;interviewPreparation\&quot;: [\n&quot; +
+                &quot;    {\n&quot; +
+                &quot;      \&quot;phaseLabel\&quot;: \&quot;Phase 1: Title\&quot;,\n&quot; +
+                &quot;      \&quot;topics\&quot;: [\&quot;topic1\&quot;, \&quot;topic2\&quot;],\n&quot; +
+                &quot;      \&quot;sampleQuestions\&quot;: [\&quot;question1\&quot;, \&quot;question2\&quot;]\n&quot; +
+                &quot;    }\n&quot; +
+                &quot;  ],\n&quot; +
+                &quot;  \&quot;careerAdvice\&quot;: \&quot;General advice for this career transition.\&quot;,\n&quot; +
+                &quot;  \&quot;summary\&quot;: \&quot;Short paragraph summarizing user's profile and readiness.\&quot;\n&quot; +
+                &quot;}&quot;;
+    }
+
+    public String buildUserPrompt(String currentRole, List&lt;String&gt; currentSkills, String targetRole, List&lt;Resource&gt; availableResources) {
+<span class="nc" id="L62">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L63">        sb.append(&quot;User Profile Details:\n&quot;);</span>
+<span class="nc" id="L64">        sb.append(&quot;- Current Role: &quot;).append(currentRole).append(&quot;\n&quot;);</span>
+<span class="nc" id="L65">        sb.append(&quot;- Current Acquired Skills: &quot;).append(String.join(&quot;, &quot;, currentSkills)).append(&quot;\n&quot;);</span>
+<span class="nc" id="L66">        sb.append(&quot;- Target Desired Role: &quot;).append(targetRole).append(&quot;\n\n&quot;);</span>
+
+<span class="nc" id="L68">        sb.append(&quot;Available Database Learning Resources (You must select from these to populate 'recommendedResources'):\n&quot;);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (availableResources.isEmpty()) {</span>
+<span class="nc" id="L70">            sb.append(&quot;- None (generate standard resources if database is empty).\n&quot;);</span>
+        } else {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            for (Resource r : availableResources) {</span>
+<span class="nc" id="L73">                sb.append(&quot;- Title: &quot;).append(r.getTitle()).append(&quot;\n&quot;);</span>
+<span class="nc" id="L74">                sb.append(&quot;  URL: &quot;).append(r.getUrl()).append(&quot;\n&quot;);</span>
+<span class="nc" id="L75">                sb.append(&quot;  Source: &quot;).append(r.getSource()).append(&quot;\n&quot;);</span>
+<span class="nc" id="L76">                sb.append(&quot;  Skills targeted: &quot;).append(String.join(&quot;, &quot;, r.getSkills())).append(&quot;\n&quot;);</span>
+<span class="nc" id="L77">                sb.append(&quot;  Tags: &quot;).append(String.join(&quot;, &quot;, r.getTags())).append(&quot;\n\n&quot;);</span>
+<span class="nc" id="L78">            }</span>
+        }
+
+<span class="nc" id="L81">        sb.append(&quot;Please analyze the gaps and generate the structured JSON object response matching the requested schema. Ensure all fields are filled.&quot;);</span>
+<span class="nc" id="L82">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

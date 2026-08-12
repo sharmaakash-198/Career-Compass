@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report"></a> &gt; <a href="index.source.html" class="el_package">com.authentication.AuthProject.features.user.service</a> &gt; <span class="el_source">UserService.java</span></div><h1>UserService.java</h1><pre class="source lang-java linenums">package com.authentication.AuthProject.features.user.service;
+
+import com.authentication.AuthProject.features.user.dto.ChangePasswordRequest;
+import com.authentication.AuthProject.features.user.dto.UpdateProfileRequest;
+import com.authentication.AuthProject.features.user.dto.UserResponse;
+import com.authentication.AuthProject.features.user.entity.User;
+import com.authentication.AuthProject.core.exception.BadRequestException;
+import com.authentication.AuthProject.core.exception.DuplicateResourceException;
+import com.authentication.AuthProject.core.exception.InvalidCredentialsException;
+import com.authentication.AuthProject.core.exception.ResourceNotFoundException;
+import com.authentication.AuthProject.features.user.repository.UserRepository;
+import com.authentication.AuthProject.core.util.EncryptionService;
+import com.authentication.AuthProject.core.util.PhoneHashService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.Period;
+
+<span class="fc" id="L23">@Slf4j</span>
+@RequiredArgsConstructor
+@Service
+public class UserService {
+
+    private final UserRepository repository;
+    private final PasswordEncoder passwordEncoder;
+    private final EncryptionService encryptionService;
+    private final PhoneHashService phoneHashService;
+    private final UserProfileCacheService userProfileCacheService;
+
+    public UserResponse getUser(Long id) {
+<span class="fc" id="L35">        log.debug(&quot;Attempting to retrieve user details for ID: {}&quot;, id);</span>
+
+<span class="fc" id="L37">        String email = repository.findEmailById(id)</span>
+<span class="fc" id="L38">                .orElseThrow(() -&gt; {</span>
+<span class="fc" id="L39">                    log.warn(&quot;User retrieval failed: User ID {} not found&quot;, id);</span>
+<span class="fc" id="L40">                    return new ResourceNotFoundException(&quot;User not found.&quot;);</span>
+                });
+
+<span class="fc" id="L43">        return userProfileCacheService.getCachedUser(email)</span>
+<span class="fc" id="L44">                .orElseGet(() -&gt; loadAndCacheUser(id));</span>
+    }
+
+    /**
+     * Builds a profile response and stores it in Memcached after successful login.
+     */
+    public void warmProfileCache(User user) {
+<span class="fc" id="L51">        UserResponse response = toResponse(user);</span>
+<span class="fc" id="L52">        userProfileCacheService.cacheUser(response);</span>
+<span class="fc" id="L53">    }</span>
+
+    @Transactional
+    public UserResponse updateUser(Long id, UpdateProfileRequest request) {
+<span class="fc" id="L57">        log.debug(&quot;Attempting to update profile for user ID: {}&quot;, id);</span>
+<span class="fc" id="L58">        User user = repository.findById(id)</span>
+<span class="fc" id="L59">                .orElseThrow(() -&gt; {</span>
+<span class="nc" id="L60">                    log.warn(&quot;User update failed: User ID {} not found&quot;, id);</span>
+<span class="nc" id="L61">                    return new ResourceNotFoundException(&quot;User not found.&quot;);</span>
+                });
+
+<span class="fc" id="L64">        String newPhone = request.getPhoneNumber();</span>
+<span class="fc" id="L65">        String newPhoneHash = phoneHashService.hash(newPhone);</span>
+
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (!user.getPhoneNumberHash().equals(newPhoneHash)</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                &amp;&amp; repository.existsByPhoneNumberHash(newPhoneHash)) {</span>
+<span class="fc" id="L69">            log.warn(&quot;User update failed: Phone number is already registered for another user&quot;);</span>
+<span class="fc" id="L70">            throw new DuplicateResourceException(</span>
+                    &quot;Phone number already registered.&quot;);
+        }
+
+<span class="fc" id="L74">        user.setFirstName(request.getFirstName());</span>
+<span class="fc" id="L75">        user.setLastName(request.getLastName());</span>
+<span class="fc" id="L76">        user.setDob(request.getDob());</span>
+<span class="fc" id="L77">        user.setGender(request.getGender());</span>
+<span class="fc" id="L78">        user.setPhoneNumber(encryptionService.encrypt(newPhone));</span>
+<span class="fc" id="L79">        user.setPhoneNumberHash(newPhoneHash);</span>
+
+<span class="fc" id="L81">        log.info(&quot;Successfully updated user profile for ID: {}&quot;, id);</span>
+<span class="fc" id="L82">        UserResponse response = toResponse(user);</span>
+<span class="fc" id="L83">        userProfileCacheService.evictUser(user.getEmail());</span>
+<span class="fc" id="L84">        return response;</span>
+    }
+
+    @Transactional
+    public void changePassword(Long id, ChangePasswordRequest request) {
+<span class="fc" id="L89">        log.debug(&quot;Attempting to change password for user ID: {}&quot;, id);</span>
+<span class="fc" id="L90">        User user = repository.findById(id)</span>
+<span class="fc" id="L91">                .orElseThrow(() -&gt; {</span>
+<span class="nc" id="L92">                    log.warn(&quot;Password change failed: User ID {} not found&quot;, id);</span>
+<span class="nc" id="L93">                    return new ResourceNotFoundException(&quot;User not found.&quot;);</span>
+                });
+
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {</span>
+<span class="fc" id="L97">            log.warn(&quot;Password change failed: Current password is incorrect for user ID {}&quot;, id);</span>
+<span class="fc" id="L98">            throw new InvalidCredentialsException(</span>
+                    &quot;Current password is incorrect.&quot;);
+        }
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (!request.getNewPassword().equals(request.getConfirmPassword())) {</span>
+<span class="fc" id="L103">            log.warn(&quot;Password change failed: New password and confirm password do not match for user ID {}&quot;, id);</span>
+<span class="fc" id="L104">            throw new BadRequestException(</span>
+                    &quot;New password and confirm password do not match.&quot;);
+        }
+
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (request.getCurrentPassword().equals(request.getNewPassword())) {</span>
+<span class="fc" id="L109">            log.warn(&quot;Password change failed: New password must be different from current password for user ID {}&quot;, id);</span>
+<span class="fc" id="L110">            throw new BadRequestException(</span>
+                    &quot;New password must be different from current password.&quot;);
+        }
+
+<span class="fc" id="L114">        user.setPassword(passwordEncoder.encode(request.getNewPassword()));</span>
+<span class="fc" id="L115">        log.info(&quot;Successfully changed password for user ID: {}&quot;, id);</span>
+<span class="fc" id="L116">    }</span>
+
+    @Transactional
+    public void deleteUser(Long id) {
+<span class="fc" id="L120">        log.debug(&quot;Attempting to delete user ID: {}&quot;, id);</span>
+<span class="fc" id="L121">        User user = repository.findById(id)</span>
+<span class="fc" id="L122">                .orElseThrow(() -&gt; {</span>
+<span class="nc" id="L123">                    log.warn(&quot;User delete failed: User ID {} not found&quot;, id);</span>
+<span class="nc" id="L124">                    return new ResourceNotFoundException(&quot;User not found.&quot;);</span>
+                });
+
+<span class="fc" id="L127">        repository.delete(user);</span>
+<span class="fc" id="L128">        userProfileCacheService.evictUser(user.getEmail());</span>
+<span class="fc" id="L129">        log.info(&quot;Successfully deleted user ID: {}&quot;, id);</span>
+<span class="fc" id="L130">    }</span>
+
+    private UserResponse loadAndCacheUser(Long id) {
+<span class="fc" id="L133">        User user = repository.findById(id)</span>
+<span class="fc" id="L134">                .orElseThrow(() -&gt; {</span>
+<span class="nc" id="L135">                    log.warn(&quot;User retrieval failed: User ID {} not found&quot;, id);</span>
+<span class="nc" id="L136">                    return new ResourceNotFoundException(&quot;User not found.&quot;);</span>
+                });
+
+<span class="fc" id="L139">        UserResponse response = toResponse(user);</span>
+<span class="fc" id="L140">        userProfileCacheService.cacheUser(response);</span>
+<span class="fc" id="L141">        return response;</span>
+    }
+
+    private UserResponse toResponse(User user) {
+
+<span class="fc" id="L146">        return UserResponse.builder()</span>
+<span class="fc" id="L147">                .id(user.getId())</span>
+<span class="fc" id="L148">                .firstName(user.getFirstName())</span>
+<span class="fc" id="L149">                .lastName(user.getLastName())</span>
+<span class="fc" id="L150">                .fullName(buildFullName(user.getFirstName(), user.getLastName()))</span>
+<span class="fc" id="L151">                .dob(user.getDob())</span>
+<span class="fc" id="L152">                .age(Period.between(user.getDob(), LocalDate.now()).getYears())</span>
+<span class="fc" id="L153">                .gender(user.getGender())</span>
+<span class="fc" id="L154">                .email(user.getEmail())</span>
+<span class="fc" id="L155">                .phoneNumber(encryptionService.decrypt(user.getPhoneNumber()))</span>
+<span class="fc" id="L156">                .build();</span>
+    }
+
+
+    private String buildFullName(String firstName, String lastName) {
+<span class="pc bpc" id="L161" title="2 of 4 branches missed.">    if (lastName == null || lastName.isBlank()) {</span>
+<span class="nc" id="L162">        return firstName;</span>
+    }
+<span class="fc" id="L164">    return firstName + &quot; &quot; + lastName;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

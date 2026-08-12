@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlobalExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report"></a> &gt; <a href="index.source.html" class="el_package">com.authentication.AuthProject.exception</a> &gt; <span class="el_source">GlobalExceptionHandler.java</span></div><h1>GlobalExceptionHandler.java</h1><pre class="source lang-java linenums">package com.authentication.AuthProject.exception;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
+<span class="fc" id="L14">@Slf4j</span>
+@RestControllerAdvice
+<span class="fc" id="L16">public class GlobalExceptionHandler {</span>
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity&lt;ApiErrorResponse&gt; handleNotFound(
+            ResourceNotFoundException ex) {
+
+<span class="fc" id="L22">        return buildResponse(</span>
+                HttpStatus.NOT_FOUND,
+<span class="fc" id="L24">                ex.getMessage(),</span>
+                null
+        );
+    }
+
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity&lt;ApiErrorResponse&gt; handleDuplicate(
+            DuplicateResourceException ex) {
+
+<span class="fc" id="L33">        return buildResponse(</span>
+                HttpStatus.CONFLICT,
+<span class="fc" id="L35">                ex.getMessage(),</span>
+                null
+        );
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity&lt;ApiErrorResponse&gt; handleCredentials(
+            InvalidCredentialsException ex) {
+
+<span class="fc" id="L44">        return buildResponse(</span>
+                HttpStatus.UNAUTHORIZED,
+<span class="fc" id="L46">                ex.getMessage(),</span>
+                null
+        );
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity&lt;ApiErrorResponse&gt; handleBadRequest(
+            BadRequestException ex) {
+
+<span class="fc" id="L55">        return buildResponse(</span>
+                HttpStatus.BAD_REQUEST,
+<span class="fc" id="L57">                ex.getMessage(),</span>
+                null
+        );
+    }
+
+    @ExceptionHandler(UnverifiedUserException.class)
+    public ResponseEntity&lt;ApiErrorResponse&gt; handleUnverifiedUser(
+            UnverifiedUserException ex) {
+
+<span class="fc" id="L66">        return buildResponse(</span>
+                HttpStatus.FORBIDDEN,
+<span class="fc" id="L68">                ex.getMessage(),</span>
+                null
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity&lt;ApiErrorResponse&gt; handleValidation(
+            MethodArgumentNotValidException ex) {
+
+<span class="fc" id="L77">        Map&lt;String, String&gt; errors = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L79">        ex.getBindingResult()</span>
+<span class="fc" id="L80">                .getFieldErrors()</span>
+<span class="fc" id="L81">                .forEach(error -&gt;</span>
+<span class="fc" id="L82">                        errors.put(</span>
+<span class="fc" id="L83">                                error.getField(),</span>
+<span class="fc" id="L84">                                error.getDefaultMessage()</span>
+                        )
+                );
+
+<span class="fc" id="L88">        return buildResponse(</span>
+                HttpStatus.BAD_REQUEST,
+                &quot;Validation Failed&quot;,
+                errors
+        );
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity&lt;ApiErrorResponse&gt; handleRateLimitExceeded(
+            RateLimitExceededException ex) {
+
+<span class="fc" id="L99">        log.warn(&quot;Rate limit exceeded: {}&quot;, ex.getMessage());</span>
+
+<span class="fc" id="L101">        return buildResponse(</span>
+                HttpStatus.TOO_MANY_REQUESTS,
+<span class="fc" id="L103">                ex.getMessage(),</span>
+                null
+        );
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;ApiErrorResponse&gt; handleGlobalException(
+            Exception ex) {
+
+<span class="fc" id="L112">        log.error(&quot;Unexpected error occurred&quot;, ex);</span>
+
+<span class="fc" id="L114">        return buildResponse(</span>
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                &quot;Something went wrong&quot;,
+                null
+        );
+    }
+
+    private ResponseEntity&lt;ApiErrorResponse&gt; buildResponse(
+            HttpStatus status,
+            String message,
+            Map&lt;String, String&gt; fieldErrors) {
+
+<span class="fc" id="L126">        ApiErrorResponse response = ApiErrorResponse.builder()</span>
+<span class="fc" id="L127">                .timestamp(Instant.now())</span>
+<span class="fc" id="L128">                .status(status.value())</span>
+<span class="fc" id="L129">                .error(status.getReasonPhrase())</span>
+<span class="fc" id="L130">                .message(message)</span>
+<span class="fc" id="L131">                .fieldErrors(fieldErrors)</span>
+<span class="fc" id="L132">                .build();</span>
+
+<span class="fc" id="L134">        return ResponseEntity.status(status).body(response);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

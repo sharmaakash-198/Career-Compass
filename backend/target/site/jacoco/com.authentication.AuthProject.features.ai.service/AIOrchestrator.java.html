@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AIOrchestrator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report"></a> &gt; <a href="index.source.html" class="el_package">com.authentication.AuthProject.features.ai.service</a> &gt; <span class="el_source">AIOrchestrator.java</span></div><h1>AIOrchestrator.java</h1><pre class="source lang-java linenums">package com.authentication.AuthProject.features.ai.service;
+
+import com.authentication.AuthProject.features.ai.client.NvidiaClient;
+import com.authentication.AuthProject.features.ai.prompt.PromptBuilder;
+import com.authentication.AuthProject.features.assessment.dto.AssessmentResponseDto;
+import com.authentication.AuthProject.features.assessment.entity.Assessment;
+import com.authentication.AuthProject.features.assessment.repository.AssessmentRepository;
+import com.authentication.AuthProject.features.user.entity.User;
+import com.authentication.AuthProject.features.interview.entity.InterviewPlan;
+import com.authentication.AuthProject.features.interview.repository.InterviewPlanRepository;
+import com.authentication.AuthProject.features.project.entity.RecommendedProject;
+import com.authentication.AuthProject.features.project.repository.RecommendedProjectRepository;
+import com.authentication.AuthProject.features.user.repository.UserRepository;
+import com.authentication.AuthProject.features.resource.entity.Resource;
+import com.authentication.AuthProject.features.resource.repository.ResourceRepository;
+import com.authentication.AuthProject.features.resume.entity.UserResume;
+import com.authentication.AuthProject.features.resume.repository.UserResumeRepository;
+import com.authentication.AuthProject.features.roadmap.entity.RoadmapMilestone;
+import com.authentication.AuthProject.features.roadmap.repository.RoadmapMilestoneRepository;
+import com.authentication.AuthProject.features.skill.entity.UserSkill;
+import com.authentication.AuthProject.features.skill.repository.UserSkillRepository;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L40">@Slf4j</span>
+public class AIOrchestrator {
+
+    private final NvidiaClient nvidiaClient;
+    private final PromptBuilder promptBuilder;
+    private final UserRepository userRepository;
+    private final UserSkillRepository userSkillRepository;
+    private final UserResumeRepository userResumeRepository;
+    private final ResourceRepository resourceRepository;
+    private final AssessmentRepository assessmentRepository;
+    private final RoadmapMilestoneRepository roadmapMilestoneRepository;
+    private final RecommendedProjectRepository recommendedProjectRepository;
+    private final InterviewPlanRepository interviewPlanRepository;
+    
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Transactional
+    public AssessmentResponseDto generateAssessment(Long userId, String currentRole, String targetRole) {
+<span class="fc" id="L58">        log.info(&quot;Generating AI career assessment for userId: {}, currentRole: {}, targetRole: {}&quot;, userId, currentRole, targetRole);</span>
+
+<span class="fc" id="L60">        User user = userRepository.findById(userId)</span>
+<span class="pc" id="L61">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;User not found with id: &quot; + userId));</span>
+
+        // 1. Fetch user's current skills
+<span class="fc" id="L64">        List&lt;String&gt; currentSkills = userSkillRepository.findByUserId(userId).stream()</span>
+<span class="fc" id="L65">                .map(UserSkill::getSkillName)</span>
+<span class="fc" id="L66">                .collect(Collectors.toList());</span>
+
+        // 2. Fetch user's latest resume text
+<span class="fc" id="L69">        List&lt;UserResume&gt; resumes = userResumeRepository.findByUserId(userId);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        String resumeText = resumes.isEmpty() ? &quot;&quot; : resumes.get(resumes.size() - 1).getRawText();</span>
+
+        // 3. Fetch available knowledge base resources
+<span class="fc" id="L73">        List&lt;Resource&gt; dbResources = resourceRepository.findAll();</span>
+
+        // 4. Build prompt
+<span class="fc" id="L76">        String systemPrompt = promptBuilder.buildSystemPrompt();</span>
+<span class="fc" id="L77">        String userPrompt = promptBuilder.buildUserPrompt(currentRole, currentSkills, targetRole, dbResources);</span>
+
+        // 5. Call NVIDIA API
+<span class="fc" id="L80">        String rawResponse = nvidiaClient.callInference(systemPrompt, userPrompt);</span>
+<span class="fc" id="L81">        String cleanJson = cleanJsonString(rawResponse);</span>
+
+<span class="fc" id="L83">        log.debug(&quot;Cleaned JSON from NVIDIA NIM API: {}&quot;, cleanJson);</span>
+
+        // 6. Parse JSON into Pojo
+        AiResponsePojo responsePojo;
+        try {
+<span class="fc" id="L88">            responsePojo = objectMapper.readValue(cleanJson, AiResponsePojo.class);</span>
+<span class="nc" id="L89">        } catch (Exception e) {</span>
+<span class="nc" id="L90">            log.error(&quot;Failed to parse JSON response from NVIDIA NIM API: {}&quot;, cleanJson, e);</span>
+<span class="nc" id="L91">            throw new RuntimeException(&quot;Error parsing AI assessment output: &quot; + e.getMessage(), e);</span>
+<span class="fc" id="L92">        }</span>
+
+        // 7. Persist to Database
+<span class="fc" id="L95">        Assessment assessment = new Assessment();</span>
+<span class="fc" id="L96">        assessment.setUser(user);</span>
+<span class="fc" id="L97">        assessment.setCurrentRole(currentRole);</span>
+<span class="fc" id="L98">        assessment.setTargetRole(targetRole);</span>
+<span class="fc" id="L99">        assessment.setScore(responsePojo.getScore());</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        assessment.setStrengths(responsePojo.getStrengths() != null ? responsePojo.getStrengths() : Collections.emptyList());</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        assessment.setWeaknesses(responsePojo.getWeaknesses() != null ? responsePojo.getWeaknesses() : Collections.emptyList());</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        assessment.setMissingSkills(responsePojo.getMissingSkills() != null ? responsePojo.getMissingSkills() : Collections.emptyList());</span>
+<span class="fc" id="L103">        assessment.setSummary(responsePojo.getSummary());</span>
+<span class="fc" id="L104">        assessment.setCareerAdvice(responsePojo.getCareerAdvice());</span>
+<span class="fc" id="L105">        assessment.setCreatedAt(Instant.now());</span>
+<span class="fc" id="L106">        assessment = assessmentRepository.save(assessment);</span>
+
+<span class="fc" id="L108">        final Assessment savedAssessment = assessment;</span>
+
+<span class="fc" id="L110">        List&lt;RoadmapMilestone&gt; milestones = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (responsePojo.getRoadmap() != null) {</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            for (RoadmapMilestonePojo rp : responsePojo.getRoadmap()) {</span>
+<span class="fc" id="L113">                RoadmapMilestone rm = new RoadmapMilestone();</span>
+<span class="fc" id="L114">                rm.setAssessment(savedAssessment);</span>
+<span class="fc" id="L115">                rm.setMonthLabel(rp.getMonthLabel());</span>
+<span class="fc" id="L116">                rm.setTopicName(rp.getTopicName());</span>
+<span class="fc" id="L117">                rm.setDescription(rp.getDescription());</span>
+<span class="fc" id="L118">                rm.setIsCompleted(false);</span>
+<span class="fc" id="L119">                milestones.add(roadmapMilestoneRepository.save(rm));</span>
+<span class="fc" id="L120">            }</span>
+        }
+
+<span class="fc" id="L123">        List&lt;RecommendedProject&gt; projects = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (responsePojo.getRecommendedProjects() != null) {</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            for (RecommendedProjectPojo pp : responsePojo.getRecommendedProjects()) {</span>
+<span class="fc" id="L126">                RecommendedProject rp = new RecommendedProject();</span>
+<span class="fc" id="L127">                rp.setAssessment(savedAssessment);</span>
+<span class="fc" id="L128">                rp.setTitle(pp.getTitle());</span>
+<span class="fc" id="L129">                rp.setDescription(pp.getDescription());</span>
+<span class="fc" id="L130">                rp.setDifficulty(pp.getDifficulty());</span>
+<span class="fc" id="L131">                rp.setDuration(pp.getDuration());</span>
+<span class="fc" id="L132">                rp.setIsCompleted(false);</span>
+<span class="fc" id="L133">                projects.add(recommendedProjectRepository.save(rp));</span>
+<span class="fc" id="L134">            }</span>
+        }
+
+<span class="fc" id="L137">        List&lt;InterviewPlan&gt; interviewPlans = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (responsePojo.getInterviewPreparation() != null) {</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (InterviewPlanPojo ip : responsePojo.getInterviewPreparation()) {</span>
+<span class="fc" id="L140">                InterviewPlan plan = new InterviewPlan();</span>
+<span class="fc" id="L141">                plan.setAssessment(savedAssessment);</span>
+<span class="fc" id="L142">                plan.setPhaseLabel(ip.getPhaseLabel());</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                plan.setTopics(ip.getTopics() != null ? ip.getTopics() : Collections.emptyList());</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                plan.setSampleQuestions(ip.getSampleQuestions() != null ? ip.getSampleQuestions() : Collections.emptyList());</span>
+<span class="fc" id="L145">                interviewPlans.add(interviewPlanRepository.save(plan));</span>
+<span class="fc" id="L146">            }</span>
+        }
+
+        // 8. Build and return response DTO matching React frontend expectations
+<span class="fc" id="L150">        return buildResponseDto(savedAssessment, milestones, projects, dbResources, interviewPlans);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public AssessmentResponseDto getLatestAssessment(Long userId) {
+<span class="fc" id="L155">        List&lt;Assessment&gt; assessments = assessmentRepository.findByUserIdOrderByCreatedAtDesc(userId);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (assessments.isEmpty()) {</span>
+<span class="fc" id="L157">            return null;</span>
+        }
+<span class="nc" id="L159">        Assessment assessment = assessments.get(0);</span>
+<span class="nc" id="L160">        List&lt;RoadmapMilestone&gt; milestones = roadmapMilestoneRepository.findByAssessmentIdOrderByMonthLabelAsc(assessment.getId());</span>
+<span class="nc" id="L161">        List&lt;RecommendedProject&gt; projects = recommendedProjectRepository.findByAssessmentId(assessment.getId());</span>
+<span class="nc" id="L162">        List&lt;InterviewPlan&gt; interviewPlans = interviewPlanRepository.findByAssessmentId(assessment.getId());</span>
+<span class="nc" id="L163">        List&lt;Resource&gt; dbResources = resourceRepository.findAll();</span>
+
+<span class="nc" id="L165">        return buildResponseDto(assessment, milestones, projects, dbResources, interviewPlans);</span>
+    }
+
+    private AssessmentResponseDto buildResponseDto(Assessment assessment,
+                                                   List&lt;RoadmapMilestone&gt; milestones,
+                                                   List&lt;RecommendedProject&gt; projects,
+                                                   List&lt;Resource&gt; dbResources,
+                                                   List&lt;InterviewPlan&gt; interviewPlans) {
+        
+        // Map missing skills with dynamic priority
+<span class="fc" id="L175">        List&lt;AssessmentResponseDto.SkillGapDto&gt; missingSkillsDto = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L176">        List&lt;String&gt; missing = assessment.getMissingSkills();</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (int i = 0; i &lt; missing.size(); i++) {</span>
+<span class="fc" id="L178">            String priority = &quot;Low&quot;;</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            if (i &lt; 3) {</span>
+<span class="fc" id="L180">                priority = &quot;High&quot;;</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            } else if (i &lt; 7) {</span>
+<span class="nc" id="L182">                priority = &quot;Medium&quot;;</span>
+            }
+<span class="fc" id="L184">            missingSkillsDto.add(AssessmentResponseDto.SkillGapDto.builder()</span>
+<span class="fc" id="L185">                    .name(missing.get(i))</span>
+<span class="fc" id="L186">                    .priority(priority)</span>
+<span class="fc" id="L187">                    .build());</span>
+        }
+
+        // Map roadmap milestones to monthly roadmap items
+        // Grouping by Month Label (e.g. Month 1 -&gt; List of topics)
+<span class="fc" id="L192">        List&lt;AssessmentResponseDto.RoadmapItemDto&gt; roadmapDto = milestones.stream()</span>
+<span class="fc" id="L193">                .collect(Collectors.groupingBy(RoadmapMilestone::getMonthLabel))</span>
+<span class="fc" id="L194">                .entrySet().stream()</span>
+<span class="fc" id="L195">                .map(entry -&gt; AssessmentResponseDto.RoadmapItemDto.builder()</span>
+<span class="fc" id="L196">                        .month(entry.getKey())</span>
+<span class="fc" id="L197">                        .topics(entry.getValue().stream().map(rm -&gt; {</span>
+<span class="pc bpc" id="L198" title="3 of 6 branches missed.">                            if (rm.getDescription() != null &amp;&amp; !rm.getDescription().isBlank() &amp;&amp; !&quot;null&quot;.equalsIgnoreCase(rm.getDescription())) {</span>
+<span class="fc" id="L199">                                return rm.getTopicName() + &quot;: &quot; + rm.getDescription();</span>
+                            }
+<span class="nc" id="L201">                            return rm.getTopicName();</span>
+<span class="fc" id="L202">                        }).collect(Collectors.toList()))</span>
+<span class="fc" id="L203">                        .build())</span>
+<span class="pc" id="L204">                .sorted((a, b) -&gt; a.getMonth().compareToIgnoreCase(b.getMonth()))</span>
+<span class="fc" id="L205">                .collect(Collectors.toList());</span>
+
+        // Map projects
+<span class="fc" id="L208">        List&lt;AssessmentResponseDto.RecommendedProjectDto&gt; projectsDto = projects.stream()</span>
+<span class="fc" id="L209">                .map(p -&gt; AssessmentResponseDto.RecommendedProjectDto.builder()</span>
+<span class="fc" id="L210">                        .name(p.getTitle())</span>
+<span class="fc" id="L211">                        .duration(p.getDuration())</span>
+<span class="fc" id="L212">                        .skillsLearned(List.of(p.getDifficulty() + &quot; level project&quot;))</span>
+<span class="fc" id="L213">                        .build())</span>
+<span class="fc" id="L214">                .collect(Collectors.toList());</span>
+
+        // Map recommended resources from DB matching missing skills
+<span class="fc" id="L217">        List&lt;AssessmentResponseDto.LearningResourceDto&gt; resourcesDto = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L218">        List&lt;String&gt; normalizedMissing = missing.stream().map(String::toLowerCase).collect(Collectors.toList());</span>
+        
+<span class="fc" id="L220">        List&lt;Resource&gt; matchedResources = dbResources.stream()</span>
+<span class="pc" id="L221">                .filter(res -&gt; res.getSkills().stream().anyMatch(skill -&gt; normalizedMissing.contains(skill.toLowerCase())))</span>
+<span class="fc" id="L222">                .collect(Collectors.toList());</span>
+
+        // Fallback to top resources if no specific skill matches
+<span class="pc bpc" id="L225" title="2 of 4 branches missed.">        if (matchedResources.isEmpty() &amp;&amp; !dbResources.isEmpty()) {</span>
+<span class="nc" id="L226">            matchedResources = dbResources.stream().limit(3).collect(Collectors.toList());</span>
+        }
+
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        for (Resource r : matchedResources) {</span>
+<span class="nc" id="L230">            String diff = &quot;Intermediate&quot;;</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            if (&quot;BEGINNER&quot;.equalsIgnoreCase(r.getDifficulty())) diff = &quot;Beginner&quot;;</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            if (&quot;ADVANCED&quot;.equalsIgnoreCase(r.getDifficulty())) diff = &quot;Advanced&quot;;</span>
+
+<span class="nc" id="L234">            resourcesDto.add(AssessmentResponseDto.LearningResourceDto.builder()</span>
+<span class="nc" id="L235">                    .name(r.getTitle())</span>
+<span class="nc" id="L236">                    .difficulty(diff)</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                    .duration(r.getEstimatedLearningTime() != null ? r.getEstimatedLearningTime() : &quot;Self-paced&quot;)</span>
+<span class="nc" id="L238">                    .link(r.getUrl())</span>
+<span class="nc" id="L239">                    .build());</span>
+<span class="nc" id="L240">        }</span>
+
+        // Map interview preparation phase
+<span class="fc" id="L243">        List&lt;AssessmentResponseDto.InterviewPlanDto&gt; interviewDto = interviewPlans.stream()</span>
+<span class="fc" id="L244">                .map(ip -&gt; AssessmentResponseDto.InterviewPlanDto.builder()</span>
+<span class="fc" id="L245">                        .phaseLabel(ip.getPhaseLabel())</span>
+<span class="fc" id="L246">                        .topics(ip.getTopics())</span>
+<span class="fc" id="L247">                        .sampleQuestions(ip.getSampleQuestions())</span>
+<span class="fc" id="L248">                        .build())</span>
+<span class="fc" id="L249">                .collect(Collectors.toList());</span>
+
+<span class="fc" id="L251">        return AssessmentResponseDto.builder()</span>
+<span class="fc" id="L252">                .marketFitScore(assessment.getScore())</span>
+<span class="fc" id="L253">                .strengths(assessment.getStrengths())</span>
+<span class="fc" id="L254">                .weaknesses(assessment.getWeaknesses())</span>
+<span class="fc" id="L255">                .missingSkills(missingSkillsDto)</span>
+<span class="fc" id="L256">                .roadmap(roadmapDto)</span>
+<span class="fc" id="L257">                .projects(projectsDto)</span>
+<span class="fc" id="L258">                .resources(resourcesDto)</span>
+<span class="fc" id="L259">                .interviewPreparation(interviewDto)</span>
+<span class="fc" id="L260">                .careerAdvice(assessment.getCareerAdvice())</span>
+<span class="fc" id="L261">                .summary(assessment.getSummary())</span>
+<span class="fc" id="L262">                .build();</span>
+    }
+
+    private String cleanJsonString(String response) {
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (response == null) return &quot;{}&quot;;</span>
+<span class="fc" id="L267">        response = response.trim();</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (response.startsWith(&quot;```json&quot;)) {</span>
+<span class="nc" id="L269">            response = response.substring(7);</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        } else if (response.startsWith(&quot;```&quot;)) {</span>
+<span class="nc" id="L271">            response = response.substring(3);</span>
+        }
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (response.endsWith(&quot;```&quot;)) {</span>
+<span class="nc" id="L274">            response = response.substring(0, response.length() - 3);</span>
+        }
+<span class="fc" id="L276">        return response.trim();</span>
+    }
+
+    // Inner classes for Jackson parsing
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AiResponsePojo {
+        private int score;
+        private List&lt;String&gt; strengths;
+        private List&lt;String&gt; weaknesses;
+        private List&lt;String&gt; missingSkills;
+        private List&lt;RoadmapMilestonePojo&gt; roadmap;
+        private List&lt;RecommendedProjectPojo&gt; recommendedProjects;
+        private List&lt;InterviewPlanPojo&gt; interviewPreparation;
+        private String careerAdvice;
+        private String summary;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RoadmapMilestonePojo {
+        private String monthLabel;
+        private String topicName;
+        private String description;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RecommendedProjectPojo {
+        private String title;
+        private String description;
+        private String difficulty;
+        private String duration;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class InterviewPlanPojo {
+        private String phaseLabel;
+        private List&lt;String&gt; topics;
+        private List&lt;String&gt; sampleQuestions;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

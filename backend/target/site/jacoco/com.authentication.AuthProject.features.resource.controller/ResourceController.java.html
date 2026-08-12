@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResourceController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report"></a> &gt; <a href="index.source.html" class="el_package">com.authentication.AuthProject.features.resource.controller</a> &gt; <span class="el_source">ResourceController.java</span></div><h1>ResourceController.java</h1><pre class="source lang-java linenums">package com.authentication.AuthProject.features.resource.controller;
+
+import com.authentication.AuthProject.features.resource.dto.ResourceDto;
+import com.authentication.AuthProject.features.resource.service.ResourceService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/resources&quot;)
+@RequiredArgsConstructor
+<span class="nc" id="L15">@Slf4j</span>
+public class ResourceController {
+
+    private final ResourceService resourceService;
+
+    @GetMapping
+    public ResponseEntity&lt;List&lt;ResourceDto&gt;&gt; getAllResources() {
+<span class="nc" id="L22">        log.info(&quot;API endpoint GET /api/resources called.&quot;);</span>
+<span class="nc" id="L23">        return ResponseEntity.ok(resourceService.getAllResources());</span>
+    }
+
+    @GetMapping(&quot;/category/{category}&quot;)
+    public ResponseEntity&lt;List&lt;ResourceDto&gt;&gt; getResourcesByCategory(@PathVariable String category) {
+<span class="nc" id="L28">        log.info(&quot;API endpoint GET /api/resources/category/{} called.&quot;, category);</span>
+<span class="nc" id="L29">        return ResponseEntity.ok(resourceService.getResourcesByCategory(category));</span>
+    }
+
+    @GetMapping(&quot;/search&quot;)
+    public ResponseEntity&lt;List&lt;ResourceDto&gt;&gt; searchResourcesBySkill(@RequestParam String skill) {
+<span class="nc" id="L34">        log.info(&quot;API endpoint GET /api/resources/search?skill={} called.&quot;, skill);</span>
+<span class="nc" id="L35">        return ResponseEntity.ok(resourceService.searchResourcesBySkill(skill));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
