@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FolderGit2, Clock, CheckSquare, Square, Info, Sparkles } from 'lucide-react';
+import { FolderGit2, Clock, CheckSquare, Square, Info } from 'lucide-react';
 import type { RecommendedProject } from '../types';
 
 interface ProjectCardProps {
@@ -25,7 +25,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isCompleted, 
       }`}
     >
       <div>
-        {/* Header Row */}
+        {/* Header Row */}Market Fit Score
+75%
+MATCH
+MODERATE FIT
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${
@@ -84,8 +87,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isCompleted, 
           <span>Duration: {project.duration}</span>
         </div>
         <div className="flex items-center gap-1 text-[10px] text-primary font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <Info className="w-3 h-3" />
-          <span>Hover for details</span>
+          {/* <Info className="w-3 h-3" /> */}
+          {/* <span>Hover for details</span> */}
         </div>
       </div>
 
@@ -93,7 +96,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isCompleted, 
       {showTooltip && (
         <div className="absolute left-0 right-0 top-full mt-2 z-30 bg-slate-900 text-white p-4 rounded-xl shadow-xl border border-slate-800 animate-in fade-in duration-150 pointer-events-none">
           <div className="flex items-center gap-1.5 mb-1 text-xs font-bold text-amber-400">
-            <Sparkles className="w-3.5 h-3.5" />
+            {/* <Sparkles className="w-3.5 h-3.5" /> */}
             <span>Project Objective</span>
           </div>
           <p className="text-xs text-slate-200 leading-relaxed">
@@ -101,7 +104,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, isCompleted, 
           </p>
           <div className="mt-2 text-[10px] text-slate-400 border-t border-slate-800 pt-1.5 flex items-center justify-between">
             <span>Target Duration: {project.duration}</span>
-            <span className="text-emerald-400 font-semibold">Portfolio Ready</span>
+            {/* <span className="text-emerald-400 font-semibold">Portfolio Ready</span> */}
           </div>
         </div>
       )}

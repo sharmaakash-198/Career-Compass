@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Compass, Menu, X } from 'lucide-react';
+import { clearUserAssessmentCache, hasCachedAssessmentResult } from '../utils/assessmentStorage';
+import { clearAuthSession } from '../utils/auth';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
@@ -9,7 +11,7 @@ export const Navbar: React.FC = () => {
 
   const userSessionRaw = localStorage.getItem('user_session');
   const userSession = userSessionRaw ? JSON.parse(userSessionRaw) : null;
-  const hasAssessment = !!localStorage.getItem('cc_assessment_result');
+  const hasAssessment = hasCachedAssessmentResult();
 
   const userName = userSession?.name || '';
   const firstName = userName.split(' ')[0] || 'Akash';
@@ -28,8 +30,8 @@ export const Navbar: React.FC = () => {
   const isActive = (path: string) => location.pathname === path;
 
   const handleSignOut = () => {
-    localStorage.removeItem('user_session');
-    localStorage.removeItem('jwt_token');
+    clearUserAssessmentCache();
+    clearAuthSession();
     navigate('/', { replace: true });
   };
 
