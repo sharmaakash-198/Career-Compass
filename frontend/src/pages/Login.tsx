@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { getPostAuthPath } from '../utils/auth';
+import { clearUserAssessmentCache } from '../utils/assessmentStorage';
+import { setAuthTokens } from '../utils/auth';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -27,7 +28,6 @@ export const Login: React.FC = () => {
 
       if (!response.ok) {
         if (response.status === 403) {
-          // Unverified user exception
           setError('Email not verified. Redirecting to verification page...');
           setTimeout(() => {
             navigate(`/verify-otp?email=${encodeURIComponent(email)}`, { replace: true });
@@ -39,40 +39,40 @@ export const Login: React.FC = () => {
         return;
       }
 
-      // Successful login: store JWT token
-      const token = data.token;
+      const accessToken = data.accessToken;
+      const refreshToken = data.refreshToken;
       const userId = data.userId;
-      localStorage.setItem('jwt_token', token);
-
-      // Fetch user profile info
-      const profileResponse = await fetch(`http://localhost:8080/api/users/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!profileResponse.ok) {
-        setError('Failed to fetch user profile. Please try again.');
-        localStorage.removeItem('jwt_token');
+      if (!accessToken || !refreshToken || userId == null) {
+        setError('Login succeeded but tokens were missing. Please try again.');
         setLoading(false);
         return;
       }
 
-      const profileData = await profileResponse.json();
-      
-      // Save user session details
+      const previousSession = localStorage.getItem('user_session');
+      let previousUserId: string | null = null;
+      if (previousSession) {
+        try {
+          const parsed = JSON.parse(previousSession) as { id?: number | string };
+          previousUserId = parsed.id != null ? String(parsed.id) : null;
+        } catch {
+          previousUserId = null;
+        }
+      }
+      if (previousUserId != null && previousUserId !== String(userId)) {
+        clearUserAssessmentCache();
+      }
+
+      setAuthTokens(accessToken, refreshToken);
       localStorage.setItem(
         'user_session',
         JSON.stringify({
-          id: profileData.id,
-          name: profileData.fullName,
-          email: profileData.email,
+          id: userId,
+          name: data.fullName,
+          email: data.email,
         })
       );
 
-      navigate(getPostAuthPath(), { replace: true });
+      navigate(data.hasAssessment ? '/dashboard' : '/assess', { replace: true });
     } catch (err) {
       console.error('Login error:', err);
       setError('Network error. Please make sure the backend is running.');

@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GraduationCap, X, AlertCircle, RefreshCw, UploadCloud, CheckCircle } from 'lucide-react';
 import { CAREER_ROLES } from '../data/roles';
-import { getUserSkills, performAssessment, syncUserSkills, uploadResumeFile } from '../services/mockAnalysis';
+import { getUserSkills, startAssessmentJob, syncUserSkills, uploadResumeFile } from '../services/mockAnalysis';
 import type { AssessmentData } from '../types';
+import { setAssessmentInput as saveAssessmentInput } from '../utils/assessmentStorage';
 
 
 
@@ -25,17 +26,8 @@ export const Assessment: React.FC = () => {
   const [resumeMessage, setResumeMessage] = useState('');
 
   // UX State
-  const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-
-  const loadingMessages = [
-    'Parsing current skill profiles...',
-    'Matching skills with industry-standard roles...',
-    'Identifying technical knowledge gaps...',
-    'Constructing month-by-month study roadmap...',
-    'Generating personalized projects and resources...'
-  ];
 
   useEffect(() => {
     getUserSkills()
@@ -49,17 +41,6 @@ export const Assessment: React.FC = () => {
       });
   }, []);
 
-  const persistSkills = async (skills: string[]) => {
-    try {
-      const saved = await syncUserSkills(skills);
-      setCurrentSkills(saved);
-      setError('');
-    } catch {
-      setError('Failed to save skills. Please try again.');
-    }
-  };
-
-  // Handle adding skill tags
   const handleAddSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
@@ -69,8 +50,9 @@ export const Assessment: React.FC = () => {
           setError('Skill already added!');
           return;
         }
-        void persistSkills([...currentSkills, cleaned]);
+        setCurrentSkills([...currentSkills, cleaned]);
         setSkillInput('');
+        setError('');
       }
     }
   };
@@ -82,13 +64,14 @@ export const Assessment: React.FC = () => {
         setError('Skill already added!');
         return;
       }
-      void persistSkills([...currentSkills, cleaned]);
+      setCurrentSkills([...currentSkills, cleaned]);
       setSkillInput('');
+      setError('');
     }
   };
 
   const handleRemoveSkill = (skillToRemove: string) => {
-    void persistSkills(currentSkills.filter(s => s !== skillToRemove));
+    setCurrentSkills(currentSkills.filter(s => s !== skillToRemove));
   };
 
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,8 +88,7 @@ export const Assessment: React.FC = () => {
       setResumeLoading(false);
       if (matched.length > 0) {
         const merged = Array.from(new Set([...currentSkills, ...matched]));
-        const saved = await syncUserSkills(merged);
-        setCurrentSkills(saved);
+        setCurrentSkills(merged);
         setResumeMessage(`Extracted ${matched.length} skills from resume: ${matched.join(', ')}`);
       } else {
         setResumeMessage('Scan completed. No matching skills found in the text file.');
@@ -129,19 +111,7 @@ export const Assessment: React.FC = () => {
     }
 
     setError('');
-    setLoading(true);
-    setLoadingStep(0);
-
-    const interval = setInterval(() => {
-      setLoadingStep(prev => {
-        if (prev < loadingMessages.length - 1) {
-          return prev + 1;
-        } else {
-          clearInterval(interval);
-          return prev;
-        }
-      });
-    }, 300);
+    setSubmitting(true);
 
     const assessmentInput: AssessmentData = {
       currentRole: currentRole.trim(),
@@ -153,36 +123,29 @@ export const Assessment: React.FC = () => {
       const savedSkills = await syncUserSkills(currentSkills);
       setCurrentSkills(savedSkills);
 
-      const result = await performAssessment(assessmentInput);
-      localStorage.setItem('cc_assessment_input', JSON.stringify(assessmentInput));
-      localStorage.setItem('cc_assessment_result', JSON.stringify(result));
-      
-      clearInterval(interval);
-      setTimeout(() => {
-        setLoading(false);
-        navigate('/dashboard', { replace: true });
-      }, 500);
-    } catch (err) {
-      clearInterval(interval);
-      setLoading(false);
-      setError('An error occurred during assessment. Please try again.');
+      saveAssessmentInput(JSON.stringify({
+        ...assessmentInput,
+        currentSkills: savedSkills,
+      }));
+
+      const { jobId } = await startAssessmentJob({
+        ...assessmentInput,
+        currentSkills: savedSkills,
+      });
+
+      navigate(`/dashboard?job=${jobId}`, { replace: true });
+    } catch {
+      setSubmitting(false);
+      setError('An error occurred while starting assessment. Please try again.');
     }
   };
 
-  if (loading) {
+  if (submitting) {
     return (
       <div className="max-w-md mx-auto py-24 px-4 text-center flex flex-col items-center justify-center min-h-[50vh]">
         <RefreshCw className="w-8 h-8 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold text-primary mb-2">Analyzing Career Path</h2>
-        <p className="text-xs text-text h-6 transition-all duration-300">
-          {loadingMessages[loadingStep]}
-        </p>
-        <div className="w-full bg-border rounded h-1 mt-6 overflow-hidden">
-          <div 
-            className="bg-primary h-1 rounded transition-all duration-300"
-            style={{ width: `${((loadingStep + 1) / loadingMessages.length) * 100}%` }}
-          />
-        </div>
+        <h2 className="text-xl font-bold text-primary mb-2">Starting Assessment</h2>
+        <p className="text-xs text-text">Saving skills and preparing your dashboard...</p>
       </div>
     );
   }
@@ -361,7 +324,8 @@ export const Assessment: React.FC = () => {
         <button
           type="submit"
           id="btn-submit-assessment"
-          className="w-full py-2.5 bg-primary text-white font-bold rounded hover:bg-slate-800 transition-colors text-sm"
+          disabled={submitting}
+          className="w-full py-2.5 bg-primary text-white font-bold rounded hover:bg-slate-800 transition-colors text-sm disabled:opacity-60"
         >
           Calculate Alignment
         </button>

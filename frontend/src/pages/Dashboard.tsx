@@ -1,13 +1,42 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { ChevronRight, RotateCcw, Target, ShieldCheck, Trophy, Sparkles, CheckCircle2, X } from 'lucide-react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { ChevronRight, RotateCcw, RefreshCw, Target, ShieldCheck, Trophy, Sparkles, CheckCircle2, X } from 'lucide-react';
 import { SkillGapCard } from '../components/SkillGapCard';
 import { RoadmapTimeline, parseTopicItem } from '../components/RoadmapTimeline';
 import { ProjectCard } from '../components/ProjectCard';
 import { ResourceCard } from '../components/ResourceCard';
-import type { AnalysisResult, AssessmentData } from '../types';
+import { ProgressiveTracker } from '../components/ProgressiveTracker';
+import { DashboardSectionSkeleton } from '../components/DashboardSectionSkeleton';
+import type {
+  AnalysisResult,
+  AssessmentData,
+  AssessmentDetails,
+  AssessmentJobStatusValue,
+  AssessmentSummary,
+} from '../types';
+import { mergeAssessment } from '../types';
 import { CAREER_ROLES } from '../data/roles';
-import { getLatestAssessment } from '../services/mockAnalysis';
+import {
+  getAssessmentDetails,
+  getAssessmentJob,
+  getAssessmentSummary,
+  persistAssessmentParts,
+} from '../services/mockAnalysis';
+import {
+  clearUserAssessmentCache,
+  getAppliedRecommendations,
+  getAssessmentDetails as getCachedAssessmentDetails,
+  getAssessmentInput,
+  getAssessmentSummary as getCachedAssessmentSummary,
+  getCompletedProjects,
+  getCompletedResources,
+  getCompletedTopics,
+  migrateLegacyAssessmentCacheIfNeeded,
+  setAppliedRecommendations as saveAppliedRecommendations,
+  setCompletedProjects as saveCompletedProjects,
+  setCompletedResources as saveCompletedResources,
+  setCompletedTopics as saveCompletedTopics,
+} from '../utils/assessmentStorage';
 
 interface Recommendation {
   id: string;
@@ -125,10 +154,54 @@ const WEEKLY_RECOMMENDATIONS: Recommendation[] = [
   }
 ];
 
+function readCachedInput(): AssessmentData | null {
+  const raw = getAssessmentInput();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AssessmentData;
+  } catch {
+    return null;
+  }
+}
+
+function readCachedSummary(): AssessmentSummary | null {
+  migrateLegacyAssessmentCacheIfNeeded();
+  const raw = getCachedAssessmentSummary();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AssessmentSummary;
+  } catch {
+    return null;
+  }
+}
+
+function readCachedDetails(): AssessmentDetails | null {
+  migrateLegacyAssessmentCacheIfNeeded();
+  const raw = getCachedAssessmentDetails();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AssessmentDetails;
+  } catch {
+    return null;
+  }
+}
+
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [assessmentInput, setAssessmentInput] = useState<AssessmentData | null>(null);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [assessmentInput, setAssessmentInput] = useState<AssessmentData | null>(readCachedInput);
+  const [summary, setSummary] = useState<AssessmentSummary | null>(() =>
+    searchParams.get('job') ? null : readCachedSummary()
+  );
+  const [details, setDetails] = useState<AssessmentDetails | null>(() =>
+    searchParams.get('job') ? null : readCachedDetails()
+  );
+  const [summaryReady, setSummaryReady] = useState(() => !!searchParams.get('job'));
+  const [detailsReady, setDetailsReady] = useState(() => !!searchParams.get('job'));
+  const [jobStatus, setJobStatus] = useState<AssessmentJobStatusValue | null>(null);
+  const [jobStep, setJobStep] = useState<number | undefined>(undefined);
+  const [jobStepMessage, setJobStepMessage] = useState<string | undefined>(undefined);
+  const [jobError, setJobError] = useState<string | null>(null);
   const [completedTopics, setCompletedTopics] = useState<string[]>([]);
   const [completedProjects, setCompletedProjects] = useState<string[]>([]);
   const [completedResources, setCompletedResources] = useState<string[]>([]);
@@ -137,42 +210,112 @@ export const Dashboard: React.FC = () => {
   const [showRecommendationsFlyout, setShowRecommendationsFlyout] = useState(false);
 
   useEffect(() => {
-    async function loadLatestAssessment() {
+    const rawInput = getAssessmentInput();
+
+    const jobIdParam = searchParams.get('job');
+    if (jobIdParam) {
+      const jobId = Number(jobIdParam);
+      if (Number.isNaN(jobId)) {
+        setJobError('Invalid assessment job.');
+        return;
+      }
+
+      let cancelled = false;
+      let timeoutId: number | undefined;
+
+      const pollJob = async () => {
+        try {
+          const status = await getAssessmentJob(jobId);
+          if (cancelled) return;
+
+          setJobStatus(status.status);
+          if (status.step) setJobStep(status.step);
+          if (status.stepMessage) setJobStepMessage(status.stepMessage);
+
+          if (status.status === 'DONE' && status.result) {
+            const parsedInput = rawInput ? (JSON.parse(rawInput) as AssessmentData) : null;
+            const nextSummary: AssessmentSummary = {
+              currentRole: parsedInput?.currentRole ?? 'Your Profile',
+              targetRole: parsedInput?.targetRole ?? 'backend',
+              marketFitScore: status.result.marketFitScore,
+              missingSkills: status.result.missingSkills,
+            };
+            const nextDetails: AssessmentDetails = {
+              roadmap: status.result.roadmap,
+              projects: status.result.projects,
+              resources: status.result.resources,
+            };
+            persistAssessmentParts(nextSummary, nextDetails);
+            setSummary(nextSummary);
+            setDetails(nextDetails);
+            if (parsedInput) {
+              setAssessmentInput(parsedInput);
+            }
+            setSummaryReady(true);
+            setDetailsReady(true);
+            setSearchParams({}, { replace: true });
+            return;
+          }
+
+          if (status.status === 'FAILED') {
+            setJobError(status.errorMessage || 'Assessment generation failed.');
+            setSearchParams({}, { replace: true });
+            return;
+          }
+
+          timeoutId = window.setTimeout(pollJob, 2000);
+        } catch {
+          if (!cancelled) {
+            setJobError('Unable to check assessment progress. Please refresh.');
+          }
+        }
+      };
+
+      pollJob();
+
+      return () => {
+        cancelled = true;
+        if (timeoutId) {
+          window.clearTimeout(timeoutId);
+        }
+      };
+    }
+
+    async function loadAssessment() {
       try {
-        const latest = await getLatestAssessment();
-        if (latest) {
-          setResult(latest);
-          
-          const rawInput = localStorage.getItem('cc_assessment_input');
-          if (rawInput) {
-            setAssessmentInput(JSON.parse(rawInput));
-          } else {
-            // Reconstruct from result
+        const [latestSummary, latestDetails] = await Promise.all([
+          getAssessmentSummary(),
+          getAssessmentDetails(),
+        ]);
+
+        if (latestSummary) {
+          setSummary(latestSummary);
+          if (!rawInput) {
             setAssessmentInput({
-              currentRole: "Your Profile",
+              currentRole: latestSummary.currentRole,
               currentSkills: [],
-              targetRole: "backend"
+              targetRole: latestSummary.targetRole,
             });
           }
-        } else {
-          const rawInput = localStorage.getItem('cc_assessment_input');
-          const rawResult = localStorage.getItem('cc_assessment_result');
-          if (rawInput && rawResult) {
-            setAssessmentInput(JSON.parse(rawInput));
-            setResult(JSON.parse(rawResult));
-          }
+        }
+
+        if (latestDetails) {
+          setDetails(latestDetails);
         }
       } catch (err) {
         console.error(err);
+      } finally {
+        setSummaryReady(true);
+        setDetailsReady(true);
       }
     }
-    
-    loadLatestAssessment();
 
-    const rawCompleted = localStorage.getItem('cc_completed_topics');
-    const rawProjects = localStorage.getItem('cc_completed_projects');
-    const rawResources = localStorage.getItem('cc_completed_resources');
-    const rawApplied = localStorage.getItem('cc_applied_recommendations');
+    loadAssessment();
+
+    const rawCompleted = getCompletedTopics();
+    const rawProjects = getCompletedProjects();
+    const rawResources = getCompletedResources();
+    const rawApplied = getAppliedRecommendations();
 
     if (rawCompleted) {
       setCompletedTopics(JSON.parse(rawCompleted));
@@ -186,15 +329,12 @@ export const Dashboard: React.FC = () => {
     if (rawApplied) {
       setAppliedRecommendations(JSON.parse(rawApplied));
     }
-  }, []);
+  }, [searchParams, setSearchParams]);
+
+  const result = summary && details ? mergeAssessment(summary, details) : null;
 
   const handleRetake = () => {
-    localStorage.removeItem('cc_assessment_input');
-    localStorage.removeItem('cc_assessment_result');
-    localStorage.removeItem('cc_completed_topics');
-    localStorage.removeItem('cc_completed_projects');
-    localStorage.removeItem('cc_completed_resources');
-    localStorage.removeItem('cc_applied_recommendations');
+    clearUserAssessmentCache();
     navigate('/assess', { replace: true });
   };
 
@@ -209,7 +349,7 @@ export const Dashboard: React.FC = () => {
     }
 
     setCompletedTopics(updated);
-    localStorage.setItem('cc_completed_topics', JSON.stringify(updated));
+    saveCompletedTopics(JSON.stringify(updated));
   };
 
   const handleToggleProject = (projectName: string) => {
@@ -220,7 +360,7 @@ export const Dashboard: React.FC = () => {
       updated = [...completedProjects, projectName];
     }
     setCompletedProjects(updated);
-    localStorage.setItem('cc_completed_projects', JSON.stringify(updated));
+    saveCompletedProjects(JSON.stringify(updated));
   };
 
   const handleToggleResource = (resourceName: string) => {
@@ -231,11 +371,11 @@ export const Dashboard: React.FC = () => {
       updated = [...completedResources, resourceName];
     }
     setCompletedResources(updated);
-    localStorage.setItem('cc_completed_resources', JSON.stringify(updated));
+    saveCompletedResources(JSON.stringify(updated));
   };
 
   const handleApplyRecommendation = (rec: Recommendation) => {
-    if (!result) return;
+    if (!result || !summary || !details) return;
 
     let updatedResult: AnalysisResult = { ...result };
 
@@ -255,19 +395,24 @@ export const Dashboard: React.FC = () => {
       }
     }
 
-    localStorage.setItem('cc_assessment_result', JSON.stringify(updatedResult));
-    setResult(updatedResult);
+    const nextDetails: AssessmentDetails = {
+      roadmap: updatedResult.roadmap,
+      projects: updatedResult.projects,
+      resources: updatedResult.resources,
+    };
+    persistAssessmentParts(summary, nextDetails);
+    setDetails(nextDetails);
 
     const updatedApplied = [...appliedRecommendations, rec.id];
     setAppliedRecommendations(updatedApplied);
-    localStorage.setItem('cc_applied_recommendations', JSON.stringify(updatedApplied));
+    saveAppliedRecommendations(JSON.stringify(updatedApplied));
 
     setToastMessage(`Applied Suggestion: ${rec.title}`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleUndoRecommendation = (rec: Recommendation) => {
-    if (!result) return;
+    if (!result || !summary || !details) return;
 
     let updatedResult: AnalysisResult = { ...result };
 
@@ -284,7 +429,7 @@ export const Dashboard: React.FC = () => {
       updatedResult.roadmap = updatedRoadmap;
 
       // Reset checked status for this topic if the user had checked it
-      const rawCompleted = localStorage.getItem('cc_completed_topics');
+      const rawCompleted = getCompletedTopics();
       if (rawCompleted) {
         const completedList: string[] = JSON.parse(rawCompleted);
         const updatedCompleted = completedList.filter(t => {
@@ -292,35 +437,79 @@ export const Dashboard: React.FC = () => {
           return !(lower.includes(rec.month!.toLowerCase()) && lower.includes(rec.skillName!.toLowerCase()));
         });
         setCompletedTopics(updatedCompleted);
-        localStorage.setItem('cc_completed_topics', JSON.stringify(updatedCompleted));
+        saveCompletedTopics(JSON.stringify(updatedCompleted));
       }
     } else if (rec.type === 'resource' && rec.resource) {
       updatedResult.resources = result.resources.filter(r => r.name !== rec.resource!.name);
 
-      // Reset checked status for this resource if the user had completed it
-      const rawCompletedRes = localStorage.getItem('cc_completed_resources');
+      const rawCompletedRes = getCompletedResources();
       if (rawCompletedRes) {
         const completedResList: string[] = JSON.parse(rawCompletedRes);
         if (completedResList.includes(rec.resource.name)) {
           const updatedCompletedRes = completedResList.filter(r => r !== rec.resource!.name);
           setCompletedResources(updatedCompletedRes);
-          localStorage.setItem('cc_completed_resources', JSON.stringify(updatedCompletedRes));
+          saveCompletedResources(JSON.stringify(updatedCompletedRes));
         }
       }
     }
 
-    localStorage.setItem('cc_assessment_result', JSON.stringify(updatedResult));
-    setResult(updatedResult);
+    const nextDetails: AssessmentDetails = {
+      roadmap: updatedResult.roadmap,
+      projects: updatedResult.projects,
+      resources: updatedResult.resources,
+    };
+    persistAssessmentParts(summary, nextDetails);
+    setDetails(nextDetails);
 
     const updatedApplied = appliedRecommendations.filter(id => id !== rec.id);
     setAppliedRecommendations(updatedApplied);
-    localStorage.setItem('cc_applied_recommendations', JSON.stringify(updatedApplied));
+    saveAppliedRecommendations(JSON.stringify(updatedApplied));
 
     setToastMessage(`Reverted Suggestion: ${rec.title}`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  if (!assessmentInput || !result) {
+  if (jobError) {
+    return (
+      <div className="max-w-md mx-auto py-16 text-center">
+        <div className="w-12 h-12 rounded border border-red-200 bg-red-50 flex items-center justify-center mx-auto mb-4 text-red-700">
+          <Target className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-primary mb-2">Assessment Failed</h2>
+        <p className="text-xs text-text mb-6">{jobError}</p>
+        <Link
+          to="/assess"
+          className="inline-flex items-center px-4 py-2 bg-primary text-white text-xs font-semibold rounded hover:bg-slate-800 transition-colors"
+        >
+          Try Again
+        </Link>
+      </div>
+    );
+  }
+
+  if (!summary && !summaryReady) {
+    return (
+      <div className="max-w-md mx-auto py-24 px-4 text-center flex flex-col items-center justify-center min-h-[50vh]">
+        <RefreshCw className="w-8 h-8 text-primary animate-spin mb-4" />
+        <h2 className="text-xl font-bold text-primary mb-2">Loading Assessment</h2>
+        <p className="text-xs text-text">Fetching your latest results...</p>
+      </div>
+    );
+  }
+
+  if (assessmentInput && !summary && jobStatus && jobStatus !== 'DONE') {
+    const targetRoleName = CAREER_ROLES.find(r => r.id === assessmentInput.targetRole)?.name || 'Custom Role';
+    return (
+      <ProgressiveTracker
+        currentStep={jobStep}
+        stepMessage={jobStepMessage}
+        status={jobStatus}
+        targetRoleName={targetRoleName}
+      />
+    );
+  }
+
+  if (summaryReady && !summary) {
     return (
       <div className="max-w-md mx-auto py-16 text-center">
         <div className="w-12 h-12 rounded border border-border bg-surface flex items-center justify-center mx-auto mb-4 text-primary">
@@ -338,17 +527,27 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  const targetRoleName = CAREER_ROLES.find(r => r.id === assessmentInput.targetRole)?.name || 'Custom Role';
+  if (!summary) {
+    return null;
+  }
+
+  const displayInput = assessmentInput ?? {
+    currentRole: summary.currentRole,
+    targetRole: summary.targetRole,
+    currentSkills: [],
+  };
+
+  const targetRoleName = CAREER_ROLES.find(r => r.id === displayInput.targetRole)?.name || 'Custom Role';
 
   // Filter recommendations matching the target role or default suggestions
   const activeRecommendations = WEEKLY_RECOMMENDATIONS.filter(
-    rec => rec.roleId === assessmentInput.targetRole || rec.roleId === 'all'
+    rec => rec.roleId === displayInput.targetRole || rec.roleId === 'all'
   );
 
   // Circular Match Progress calculations
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (result.marketFitScore / 100) * circumference;
+  const strokeDashoffset = circumference - (summary.marketFitScore / 100) * circumference;
 
   const getScoreClassification = (score: number) => {
     if (score >= 80) return { label: 'High Alignment', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
@@ -356,19 +555,20 @@ export const Dashboard: React.FC = () => {
     return { label: 'Gaps Identified', color: 'text-red-700 bg-red-50 border-red-200' };
   };
 
-  const classification = getScoreClassification(result.marketFitScore);
+  const classification = getScoreClassification(summary.marketFitScore);
 
-  // Progress metrics calculation matching precise RoadmapTimeline parsed line cards
-  const totalRoadmapTopics = result.roadmap.reduce((acc, curr) => {
-    return acc + curr.topics.flatMap(t => parseTopicItem(t)).length;
-  }, 0);
+  const totalRoadmapTopics = details
+    ? details.roadmap.reduce((acc, curr) => acc + curr.topics.flatMap(t => parseTopicItem(t)).length, 0)
+    : 0;
 
-  const totalCompletedTopics = completedTopics.filter(topicKey => {
-    return result.roadmap.some(item => {
-      const parsed = item.topics.flatMap(t => parseTopicItem(t));
-      return parsed.some(pt => topicKey === `${item.month} - ${pt.rawString}` || topicKey === `${item.month} - ${pt.title}`);
-    });
-  }).length;
+  const totalCompletedTopics = details
+    ? completedTopics.filter(topicKey =>
+        details.roadmap.some(item => {
+          const parsed = item.topics.flatMap(t => parseTopicItem(t));
+          return parsed.some(pt => topicKey === `${item.month} - ${pt.rawString}` || topicKey === `${item.month} - ${pt.title}`);
+        })
+      ).length
+    : 0;
 
   const roadmapProgressPercentage = totalRoadmapTopics > 0
     ? Math.round((totalCompletedTopics / totalRoadmapTopics) * 100)
@@ -492,7 +692,7 @@ export const Dashboard: React.FC = () => {
             Path to {targetRoleName}
           </h2>
           <p className="text-xs text-text mt-0.5">
-            Upskilling requirements from <span className="font-semibold">{assessmentInput.currentRole}</span>
+            Upskilling requirements from <span className="font-semibold">{displayInput.currentRole}</span>
           </p>
         </div>
 
@@ -554,7 +754,7 @@ export const Dashboard: React.FC = () => {
             </svg>
             <div className="absolute flex flex-col items-center">
               <span className="text-2xl font-bold text-primary">
-                {result.marketFitScore}%
+                {summary.marketFitScore}%
               </span>
               <span className="text-[9px] text-text font-bold uppercase tracking-wider">Match</span>
             </div>
@@ -576,13 +776,17 @@ export const Dashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-h-[280px] max-h-[320px] overflow-y-auto pr-1">
-            {result.missingSkills.map((skill, index) => (
+            {summary.missingSkills.map((skill, index) => (
               <SkillGapCard key={index} skill={skill} />
             ))}
           </div>
         </div>
       </div>
 
+      {!detailsReady || !details ? (
+        !detailsReady ? <DashboardSectionSkeleton /> : null
+      ) : (
+        <>
       {/* Roadmap & Projects Splits */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-8">
         {/* Timeline (left 2 cols) */}
@@ -611,7 +815,7 @@ export const Dashboard: React.FC = () => {
 
           <div className="w-full">
             <RoadmapTimeline
-              roadmap={result.roadmap}
+              roadmap={details.roadmap}
               completedTopics={completedTopics}
               onToggleTopic={handleToggleTopic}
             />
@@ -626,11 +830,11 @@ export const Dashboard: React.FC = () => {
               <p className="text-[10px] text-text">Practice exercises to construct a verified portfolio.</p>
             </div>
             <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/10">
-              {result.projects.filter(p => completedProjects.includes(p.name)).length}/{result.projects.length} Done
+              {details.projects.filter(p => completedProjects.includes(p.name)).length}/{details.projects.length} Done
             </span>
           </div>
           <div className="grid w-full grid-cols-1 gap-3.5">
-            {result.projects.map((proj, idx) => (
+            {details.projects.map((proj, idx) => (
               <ProjectCard
                 key={idx}
                 project={proj}
@@ -649,7 +853,7 @@ export const Dashboard: React.FC = () => {
           <p className="text-xs text-text">Handpicked reference guides to cover technical fundamentals.</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {result.resources.map((res, idx) => (
+          {details.resources.map((res, idx) => (
             <ResourceCard
               key={idx}
               resource={res}
@@ -659,6 +863,8 @@ export const Dashboard: React.FC = () => {
           ))}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

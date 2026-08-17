@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Building2, Briefcase, Award, GraduationCap, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { AssessmentData } from '../types';
+import { getAssessmentInput } from '../utils/assessmentStorage';
 
 interface FirmSkill {
   name: string;
@@ -253,7 +254,7 @@ export const CompanyTrends: React.FC = () => {
       setUserSession(JSON.parse(rawSession));
     }
 
-    const rawInput = localStorage.getItem('cc_assessment_input');
+    const rawInput = getAssessmentInput();
     if (rawInput) {
       const parsedInput = JSON.parse(rawInput) as AssessmentData;
       setUserSkills(parsedInput.currentSkills || []);

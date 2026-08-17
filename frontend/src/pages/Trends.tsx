@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, 
   Legend
 } from 'recharts';
+import { getAssessmentInput } from '../utils/assessmentStorage';
 import { CAREER_ROLES } from '../data/roles';
 import { 
   Search, 
@@ -173,7 +174,7 @@ export const Trends: React.FC = () => {
 
   // Load user's target role on mount if available
   useEffect(() => {
-    const rawInput = localStorage.getItem('cc_assessment_input');
+    const rawInput = getAssessmentInput();
     if (rawInput) {
       try {
         const input = JSON.parse(rawInput);
