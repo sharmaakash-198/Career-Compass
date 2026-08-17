@@ -7,6 +7,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -28,7 +29,23 @@ public class NvidiaClient {
     @Value("${nvidia.base-url}")
     private String baseUrl;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Value("${nvidia.max-tokens:2048}")
+    private int maxTokens;
+
+    @Value("${nvidia.read-timeout-ms:120000}")
+    private int readTimeoutMs;
+
+    private RestTemplate restTemplate;
+
+    private RestTemplate getRestTemplate() {
+        if (restTemplate == null) {
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(10_000);
+            factory.setReadTimeout(readTimeoutMs);
+            restTemplate = new RestTemplate(factory);
+        }
+        return restTemplate;
+    }
 
     public String callInference(String systemPrompt, String userPrompt) {
         if (apiKey == null || apiKey.trim().isEmpty() || "MOCK".equalsIgnoreCase(apiKey.trim())) {
@@ -49,11 +66,12 @@ public class NvidiaClient {
                     Map.of("role", "user", "content", userPrompt)
             ));
             requestBody.put("temperature", 0.2);
+            requestBody.put("max_tokens", maxTokens);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             String url = baseUrl + "/chat/completions";
 
-            ResponseEntity<Map> responseEntity = restTemplate.postForEntity(url, entity, Map.class);
+            ResponseEntity<Map> responseEntity = getRestTemplate().postForEntity(url, entity, Map.class);
             if (responseEntity.getStatusCode().is2xxSuccessful() && responseEntity.getBody() != null) {
                 List<Map> choices = (List<Map>) responseEntity.getBody().get("choices");
                 if (choices != null && !choices.isEmpty()) {
@@ -132,16 +150,6 @@ public class NvidiaClient {
                 "      \"description\": \"Containerize your Spring Boot application and establish a Github Actions pipeline that builds and publishes images.\",\n" +
                 "      \"difficulty\": \"Intermediate\",\n" +
                 "      \"duration\": \"2 weeks\"\n" +
-                "    }\n" +
-                "  ],\n" +
-                "  \"interviewPreparation\": [\n" +
-                "    {\n" +
-                "      \"phaseLabel\": \"Phase 1: Container Orchestration\",\n" +
-                "      \"topics\": [\"Docker Container Life Cycles\", \"Kubernetes Service Types\"],\n" +
-                "      \"sampleQuestions\": [\n" +
-                "        \"What is the difference between an image and a container in Docker?\",\n" +
-                "        \"Explain the difference between ClusterIP, NodePort, and LoadBalancer services.\"\n" +
-                "      ]\n" +
                 "    }\n" +
                 "  ],\n" +
                 "  \"careerAdvice\": \"Given your target of " + targetRole + ", you should concentrate on infrastructure automation. Focus on practical deployments on public clouds or local Kubernetes clusters.\",\n" +

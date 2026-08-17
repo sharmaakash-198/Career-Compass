@@ -1,6 +1,7 @@
 package com.authentication.AuthProject.features.auth.controller;
 
 import com.authentication.AuthProject.features.auth.dto.LoginRequest;
+import com.authentication.AuthProject.features.auth.dto.RefreshTokenRequest;
 import com.authentication.AuthProject.features.auth.dto.ResendOtpRequest;
 import com.authentication.AuthProject.features.auth.dto.SignupRequest;
 import com.authentication.AuthProject.features.auth.dto.VerifyOtpRequest;
@@ -104,7 +105,8 @@ class AuthControllerTest {
                 .thenReturn(AuthResponse.builder()
                         .userId(1L)
                         .message("Login successful")
-                        .token("jwt-token")
+                        .accessToken("access-token")
+                        .refreshToken("refresh-token")
                         .build());
 
         String body = """
@@ -118,7 +120,32 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt-token"));
+                .andExpect(jsonPath("$.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
+    }
+
+    @Test
+    void refresh_shouldReturn200() throws Exception {
+        when(authService.refresh(any(RefreshTokenRequest.class)))
+                .thenReturn(AuthResponse.builder()
+                        .userId(1L)
+                        .message("Token refreshed")
+                        .accessToken("new-access")
+                        .refreshToken("new-refresh")
+                        .build());
+
+        String body = """
+                {
+                  "refreshToken": "valid-refresh"
+                }
+                """;
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("new-access"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh"));
     }
 
     @Test

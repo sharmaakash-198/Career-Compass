@@ -1,14 +1,11 @@
 package com.authentication.AuthProject.features.auth.service;
 
-import com.authentication.AuthProject.features.auth.dto.LoginRequest;
-import com.authentication.AuthProject.features.auth.dto.ResendOtpRequest;
-import com.authentication.AuthProject.features.auth.dto.SignupRequest;
-import com.authentication.AuthProject.features.auth.dto.VerifyOtpRequest;
-import com.authentication.AuthProject.features.auth.dto.AuthResponse;
+import com.authentication.AuthProject.features.auth.dto.*;
 import com.authentication.AuthProject.features.user.entity.User;
 import com.authentication.AuthProject.core.exception.DuplicateResourceException;
 import com.authentication.AuthProject.core.exception.InvalidCredentialsException;
 import com.authentication.AuthProject.core.exception.UnverifiedUserException;
+import com.authentication.AuthProject.features.assessment.repository.AssessmentRepository;
 import com.authentication.AuthProject.features.user.repository.UserRepository;
 import com.authentication.AuthProject.core.security.JwtService;
 import com.authentication.AuthProject.core.util.EncryptionService;
@@ -32,6 +29,7 @@ public class AuthService {
     private final UserService userService;
     private final RateLimitService rateLimitService;
     private final JwtService jwtService;
+    private final AssessmentRepository assessmentRepository;
 
     public AuthResponse signup(SignupRequest request) {
         String email = request.getEmail().trim().toLowerCase();
@@ -112,12 +110,17 @@ public class AuthService {
 
         log.info("User login validated successfully for ID: {}", user.getId());
 
-        String token = jwtService.generateToken(user.getEmail());
+        String accessToken = jwtService.generateAccessToken(user.getEmail());
+        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
 
         return AuthResponse.builder()
                 .userId(user.getId())
                 .message("Login successful")
-                .token(token)
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .fullName(buildFullName(user.getFirstName(), user.getLastName()))
+                .email(user.getEmail())
+                .hasAssessment(assessmentRepository.existsByUserId(user.getId()))
                 .build();
     }
 
@@ -135,5 +138,39 @@ public class AuthService {
         return AuthResponse.builder()
                 .message("OTP sent to your email.")
                 .build();
+    }
+
+    public AuthResponse refresh(RefreshTokenRequest request) {
+        String refreshToken = request.getRefreshToken();
+        String email;
+        try {
+            if (!jwtService.isRefreshToken(refreshToken)) {
+                throw new InvalidCredentialsException("Invalid refresh token.");
+            }
+            email = jwtService.extractUsername(refreshToken);
+        } catch (Exception ex) {
+            throw new InvalidCredentialsException("Invalid refresh token.");
+        }
+
+        User user = repository.findByEmail(email)
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid refresh token."));
+
+        if (!user.isVerified() || !jwtService.isRefreshTokenValid(refreshToken, user.getEmail())) {
+            throw new InvalidCredentialsException("Invalid refresh token.");
+        }
+
+        return AuthResponse.builder()
+                .userId(user.getId())
+                .message("Token refreshed")
+                .accessToken(jwtService.generateAccessToken(user.getEmail()))
+                .refreshToken(jwtService.generateRefreshToken(user.getEmail()))
+                .build();
+    }
+
+    private String buildFullName(String firstName, String lastName) {
+        if (lastName == null || lastName.isBlank()) {
+            return firstName;
+        }
+        return firstName + " " + lastName;
     }
 }

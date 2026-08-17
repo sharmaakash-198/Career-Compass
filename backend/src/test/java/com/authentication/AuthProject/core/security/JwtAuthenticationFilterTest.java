@@ -87,7 +87,7 @@ class JwtAuthenticationFilterTest {
                 .authorities(List.of(new SimpleGrantedAuthority("ROLE_USER")))
                 .build();
         when(userDetailsService.loadUserByUsername("test@gmail.com")).thenReturn(userDetails);
-        when(jwtService.isTokenValid("valid.jwt.token", "test@gmail.com")).thenReturn(true);
+        when(jwtService.isAccessTokenValid("valid.jwt.token", "test@gmail.com")).thenReturn(true);
 
         filter.doFilterInternal(request, response, filterChain);
 

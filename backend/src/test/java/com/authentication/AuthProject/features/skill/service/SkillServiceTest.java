@@ -14,11 +14,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -64,18 +62,14 @@ class SkillServiceTest {
         when(userSkillRepository.findByUserId(1L))
                 .thenReturn(new ArrayList<>(List.of(resumeSkill, manualSkill)))
                 .thenReturn(new ArrayList<>(List.of(resumeSkill, reactSkill)));
-        when(userSkillRepository.findByUserIdAndSkillNameIgnoreCase(eq(1L), eq("Java")))
-                .thenReturn(Optional.of(resumeSkill));
-        when(userSkillRepository.findByUserIdAndSkillNameIgnoreCase(eq(1L), eq("React")))
-                .thenReturn(Optional.empty());
 
         List<String> result = skillService.syncSkills(user, List.of("Java", "React"));
 
-        verify(userSkillRepository).delete(manualSkill);
-        ArgumentCaptor<UserSkill> saved = ArgumentCaptor.forClass(UserSkill.class);
-        verify(userSkillRepository).save(saved.capture());
-        assertEquals("React", saved.getValue().getSkillName());
-        assertEquals("MANUAL", saved.getValue().getSource());
+        verify(userSkillRepository).deleteAllInBatch(List.of(manualSkill));
+        ArgumentCaptor<List<UserSkill>> saved = ArgumentCaptor.forClass(List.class);
+        verify(userSkillRepository).saveAll(saved.capture());
+        assertEquals("React", saved.getValue().get(0).getSkillName());
+        assertEquals("MANUAL", saved.getValue().get(0).getSource());
         assertEquals(List.of("Java", "React"), result);
     }
 
@@ -91,12 +85,10 @@ class SkillServiceTest {
         when(userSkillRepository.findByUserId(1L))
                 .thenReturn(new ArrayList<>())
                 .thenReturn(new ArrayList<>(List.of(reactSkill)));
-        when(userSkillRepository.findByUserIdAndSkillNameIgnoreCase(eq(1L), eq("react")))
-                .thenReturn(Optional.empty());
 
         List<String> result = skillService.syncSkills(user, List.of("react", "React", " REACT "));
 
-        verify(userSkillRepository).save(any(UserSkill.class));
+        verify(userSkillRepository).saveAll(anyList());
         assertEquals(List.of("react"), result);
     }
 }

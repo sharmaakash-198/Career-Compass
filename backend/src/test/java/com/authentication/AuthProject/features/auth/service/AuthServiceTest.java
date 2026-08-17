@@ -1,6 +1,7 @@
 package com.authentication.AuthProject.features.auth.service;
 
 import com.authentication.AuthProject.features.auth.dto.LoginRequest;
+import com.authentication.AuthProject.features.auth.dto.RefreshTokenRequest;
 import com.authentication.AuthProject.features.auth.dto.ResendOtpRequest;
 import com.authentication.AuthProject.features.auth.dto.SignupRequest;
 import com.authentication.AuthProject.features.auth.dto.VerifyOtpRequest;
@@ -10,6 +11,7 @@ import com.authentication.AuthProject.features.user.entity.Gender;
 import com.authentication.AuthProject.core.exception.DuplicateResourceException;
 import com.authentication.AuthProject.core.exception.InvalidCredentialsException;
 import com.authentication.AuthProject.core.exception.UnverifiedUserException;
+import com.authentication.AuthProject.features.assessment.repository.AssessmentRepository;
 import com.authentication.AuthProject.features.user.repository.UserRepository;
 import com.authentication.AuthProject.core.security.JwtService;
 import com.authentication.AuthProject.core.util.EncryptionService;
@@ -30,6 +32,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
@@ -65,6 +68,9 @@ class AuthServiceTest {
 
     @Mock
     private JwtService jwtService;
+
+    @Mock
+    private AssessmentRepository assessmentRepository;
 
     private SignupRequest signupRequest;
 
@@ -166,7 +172,8 @@ class AuthServiceTest {
 
         assertThrows(InvalidCredentialsException.class, () -> authService.login(request));
         verify(rateLimitService).recordFailedAttempt("test@gmail.com");
-        verify(jwtService, never()).generateToken(any());
+        verify(jwtService, never()).generateAccessToken(any());
+        verify(jwtService, never()).generateRefreshToken(any());
     }
 
     @Test
@@ -189,7 +196,8 @@ class AuthServiceTest {
 
         assertThrows(UnverifiedUserException.class, () -> authService.login(request));
         verify(rateLimitService).resetLoginLimit("test@gmail.com");
-        verify(jwtService, never()).generateToken(any());
+        verify(jwtService, never()).generateAccessToken(any());
+        verify(jwtService, never()).generateRefreshToken(any());
     }
 
     @Test
@@ -201,6 +209,8 @@ class AuthServiceTest {
 
         User user = User.builder()
                 .id(1L)
+                .firstName("Akash")
+                .lastName("Sharma")
                 .email("test@gmail.com")
                 .password("encoded")
                 .verified(true)
@@ -209,15 +219,61 @@ class AuthServiceTest {
         when(repository.findByEmail("test@gmail.com")).thenReturn(Optional.of(user));
         doNothing().when(rateLimitService).checkLoginBlocked("test@gmail.com");
         when(passwordEncoder.matches("Password@1", "encoded")).thenReturn(true);
-        when(jwtService.generateToken("test@gmail.com")).thenReturn("jwt-token");
+        when(jwtService.generateAccessToken("test@gmail.com")).thenReturn("access-token");
+        when(jwtService.generateRefreshToken("test@gmail.com")).thenReturn("refresh-token");
+        when(assessmentRepository.existsByUserId(1L)).thenReturn(true);
 
         AuthResponse response = authService.login(request);
 
         assertEquals(1L, response.getUserId());
         assertEquals("Login successful", response.getMessage());
-        assertEquals("jwt-token", response.getToken());
+        assertEquals("access-token", response.getAccessToken());
+        assertEquals("refresh-token", response.getRefreshToken());
+        assertEquals("Akash Sharma", response.getFullName());
+        assertEquals("test@gmail.com", response.getEmail());
+        assertTrue(response.getHasAssessment());
         verify(rateLimitService).resetLoginLimit("test@gmail.com");
         verify(userService).warmProfileCache(user);
+    }
+
+    @Test
+    void refresh_shouldReturnNewTokenPair_whenRefreshTokenIsValid() {
+        RefreshTokenRequest request = RefreshTokenRequest.builder()
+                .refreshToken("valid-refresh")
+                .build();
+
+        User user = User.builder()
+                .id(1L)
+                .email("test@gmail.com")
+                .verified(true)
+                .build();
+
+        when(jwtService.isRefreshToken("valid-refresh")).thenReturn(true);
+        when(jwtService.extractUsername("valid-refresh")).thenReturn("test@gmail.com");
+        when(repository.findByEmail("test@gmail.com")).thenReturn(Optional.of(user));
+        when(jwtService.isRefreshTokenValid("valid-refresh", "test@gmail.com")).thenReturn(true);
+        when(jwtService.generateAccessToken("test@gmail.com")).thenReturn("new-access");
+        when(jwtService.generateRefreshToken("test@gmail.com")).thenReturn("new-refresh");
+
+        AuthResponse response = authService.refresh(request);
+
+        assertEquals(1L, response.getUserId());
+        assertEquals("Token refreshed", response.getMessage());
+        assertEquals("new-access", response.getAccessToken());
+        assertEquals("new-refresh", response.getRefreshToken());
+    }
+
+    @Test
+    void refresh_shouldRejectAccessTokenUsedAsRefresh() {
+        RefreshTokenRequest request = RefreshTokenRequest.builder()
+                .refreshToken("access-token")
+                .build();
+
+        when(jwtService.isRefreshToken("access-token")).thenReturn(false);
+
+        assertThrows(InvalidCredentialsException.class, () -> authService.refresh(request));
+        verify(jwtService, never()).generateAccessToken(any());
+        verify(jwtService, never()).generateRefreshToken(any());
     }
 
     @Test

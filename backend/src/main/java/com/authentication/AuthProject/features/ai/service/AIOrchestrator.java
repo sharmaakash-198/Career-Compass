@@ -2,19 +2,17 @@ package com.authentication.AuthProject.features.ai.service;
 
 import com.authentication.AuthProject.features.ai.client.NvidiaClient;
 import com.authentication.AuthProject.features.ai.prompt.PromptBuilder;
+import com.authentication.AuthProject.features.assessment.dto.AssessmentDetailsDto;
 import com.authentication.AuthProject.features.assessment.dto.AssessmentResponseDto;
+import com.authentication.AuthProject.features.assessment.dto.AssessmentSummaryDto;
 import com.authentication.AuthProject.features.assessment.entity.Assessment;
 import com.authentication.AuthProject.features.assessment.repository.AssessmentRepository;
 import com.authentication.AuthProject.features.user.entity.User;
-import com.authentication.AuthProject.features.interview.entity.InterviewPlan;
-import com.authentication.AuthProject.features.interview.repository.InterviewPlanRepository;
 import com.authentication.AuthProject.features.project.entity.RecommendedProject;
 import com.authentication.AuthProject.features.project.repository.RecommendedProjectRepository;
 import com.authentication.AuthProject.features.user.repository.UserRepository;
 import com.authentication.AuthProject.features.resource.entity.Resource;
 import com.authentication.AuthProject.features.resource.repository.ResourceRepository;
-import com.authentication.AuthProject.features.resume.entity.UserResume;
-import com.authentication.AuthProject.features.resume.repository.UserResumeRepository;
 import com.authentication.AuthProject.features.roadmap.entity.RoadmapMilestone;
 import com.authentication.AuthProject.features.roadmap.repository.RoadmapMilestoneRepository;
 import com.authentication.AuthProject.features.skill.entity.UserSkill;
@@ -32,7 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,13 +44,11 @@ public class AIOrchestrator {
     private final PromptBuilder promptBuilder;
     private final UserRepository userRepository;
     private final UserSkillRepository userSkillRepository;
-    private final UserResumeRepository userResumeRepository;
     private final ResourceRepository resourceRepository;
     private final AssessmentRepository assessmentRepository;
     private final RoadmapMilestoneRepository roadmapMilestoneRepository;
     private final RecommendedProjectRepository recommendedProjectRepository;
-    private final InterviewPlanRepository interviewPlanRepository;
-    
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
@@ -60,29 +58,18 @@ public class AIOrchestrator {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
 
-        // 1. Fetch user's current skills
         List<String> currentSkills = userSkillRepository.findByUserId(userId).stream()
                 .map(UserSkill::getSkillName)
                 .collect(Collectors.toList());
 
-        // 2. Fetch user's latest resume text
-        List<UserResume> resumes = userResumeRepository.findByUserId(userId);
-        String resumeText = resumes.isEmpty() ? "" : resumes.get(resumes.size() - 1).getRawText();
-
-        // 3. Fetch available knowledge base resources
-        List<Resource> dbResources = resourceRepository.findAll();
-
-        // 4. Build prompt
         String systemPrompt = promptBuilder.buildSystemPrompt();
-        String userPrompt = promptBuilder.buildUserPrompt(currentRole, currentSkills, targetRole, dbResources);
+        String userPrompt = promptBuilder.buildUserPrompt(currentRole, currentSkills, targetRole);
 
-        // 5. Call NVIDIA API
         String rawResponse = nvidiaClient.callInference(systemPrompt, userPrompt);
         String cleanJson = cleanJsonString(rawResponse);
 
         log.debug("Cleaned JSON from NVIDIA NIM API: {}", cleanJson);
 
-        // 6. Parse JSON into Pojo
         AiResponsePojo responsePojo;
         try {
             responsePojo = objectMapper.readValue(cleanJson, AiResponsePojo.class);
@@ -91,7 +78,6 @@ public class AIOrchestrator {
             throw new RuntimeException("Error parsing AI assessment output: " + e.getMessage(), e);
         }
 
-        // 7. Persist to Database
         Assessment assessment = new Assessment();
         assessment.setUser(user);
         assessment.setCurrentRole(currentRole);
@@ -116,9 +102,10 @@ public class AIOrchestrator {
                 rm.setTopicName(rp.getTopicName());
                 rm.setDescription(rp.getDescription());
                 rm.setIsCompleted(false);
-                milestones.add(roadmapMilestoneRepository.save(rm));
+                milestones.add(rm);
             }
         }
+        milestones = roadmapMilestoneRepository.saveAll(milestones);
 
         List<RecommendedProject> projects = new ArrayList<>();
         if (responsePojo.getRecommendedProjects() != null) {
@@ -130,50 +117,108 @@ public class AIOrchestrator {
                 rp.setDifficulty(pp.getDifficulty());
                 rp.setDuration(pp.getDuration());
                 rp.setIsCompleted(false);
-                projects.add(recommendedProjectRepository.save(rp));
+                projects.add(rp);
             }
         }
+        projects = recommendedProjectRepository.saveAll(projects);
 
-        List<InterviewPlan> interviewPlans = new ArrayList<>();
-        if (responsePojo.getInterviewPreparation() != null) {
-            for (InterviewPlanPojo ip : responsePojo.getInterviewPreparation()) {
-                InterviewPlan plan = new InterviewPlan();
-                plan.setAssessment(savedAssessment);
-                plan.setPhaseLabel(ip.getPhaseLabel());
-                plan.setTopics(ip.getTopics() != null ? ip.getTopics() : Collections.emptyList());
-                plan.setSampleQuestions(ip.getSampleQuestions() != null ? ip.getSampleQuestions() : Collections.emptyList());
-                interviewPlans.add(interviewPlanRepository.save(plan));
-            }
-        }
-
-        // 8. Build and return response DTO matching React frontend expectations
-        return buildResponseDto(savedAssessment, milestones, projects, dbResources, interviewPlans);
+        return mergeResponse(buildSummaryDto(savedAssessment), buildDetailsDto(savedAssessment, milestones, projects));
     }
 
     @Transactional(readOnly = true)
     public AssessmentResponseDto getLatestAssessment(Long userId) {
-        List<Assessment> assessments = assessmentRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        if (assessments.isEmpty()) {
+        AssessmentSummaryDto summary = getLatestSummary(userId);
+        if (summary == null) {
             return null;
         }
-        Assessment assessment = assessments.get(0);
-        List<RoadmapMilestone> milestones = roadmapMilestoneRepository.findByAssessmentIdOrderByMonthLabelAsc(assessment.getId());
-        List<RecommendedProject> projects = recommendedProjectRepository.findByAssessmentId(assessment.getId());
-        List<InterviewPlan> interviewPlans = interviewPlanRepository.findByAssessmentId(assessment.getId());
-        List<Resource> dbResources = resourceRepository.findAll();
-
-        return buildResponseDto(assessment, milestones, projects, dbResources, interviewPlans);
+        AssessmentDetailsDto details = getLatestDetails(userId);
+        if (details == null) {
+            details = AssessmentDetailsDto.builder()
+                    .roadmap(Collections.emptyList())
+                    .projects(Collections.emptyList())
+                    .resources(Collections.emptyList())
+                    .build();
+        }
+        return mergeResponse(summary, details);
     }
 
-    private AssessmentResponseDto buildResponseDto(Assessment assessment,
+    @Transactional(readOnly = true)
+    public AssessmentSummaryDto getLatestSummary(Long userId) {
+        return findLatestAssessment(userId).map(this::buildSummaryDto).orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public AssessmentDetailsDto getLatestDetails(Long userId) {
+        Optional<Assessment> assessmentOpt = findLatestAssessment(userId);
+        if (assessmentOpt.isEmpty()) {
+            return null;
+        }
+        Assessment assessment = assessmentOpt.get();
+        List<RoadmapMilestone> milestones = roadmapMilestoneRepository.findByAssessmentIdOrderByMonthLabelAsc(assessment.getId());
+        List<RecommendedProject> projects = recommendedProjectRepository.findByAssessmentId(assessment.getId());
+        return buildDetailsDto(assessment, milestones, projects);
+    }
+
+    @Transactional(readOnly = true)
+    public AssessmentResponseDto getAssessmentById(Long userId, Long assessmentId) {
+        Assessment assessment = assessmentRepository.findByIdAndUserId(assessmentId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Assessment not found: " + assessmentId));
+        List<RoadmapMilestone> milestones = roadmapMilestoneRepository.findByAssessmentIdOrderByMonthLabelAsc(assessment.getId());
+        List<RecommendedProject> projects = recommendedProjectRepository.findByAssessmentId(assessment.getId());
+        return mergeResponse(buildSummaryDto(assessment), buildDetailsDto(assessment, milestones, projects));
+    }
+
+    private Optional<Assessment> findLatestAssessment(Long userId) {
+        List<Assessment> assessments = assessmentRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        if (assessments.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(assessments.get(0));
+    }
+
+    private AssessmentSummaryDto buildSummaryDto(Assessment assessment) {
+        return AssessmentSummaryDto.builder()
+                .assessmentId(assessment.getId())
+                .currentRole(assessment.getCurrentRole())
+                .targetRole(assessment.getTargetRole())
+                .marketFitScore(assessment.getScore())
+                .strengths(assessment.getStrengths())
+                .weaknesses(assessment.getWeaknesses())
+                .missingSkills(buildMissingSkillsDto(assessment.getMissingSkills()))
+                .summary(assessment.getSummary())
+                .careerAdvice(assessment.getCareerAdvice())
+                .build();
+    }
+
+    private AssessmentDetailsDto buildDetailsDto(Assessment assessment,
                                                    List<RoadmapMilestone> milestones,
-                                                   List<RecommendedProject> projects,
-                                                   List<Resource> dbResources,
-                                                   List<InterviewPlan> interviewPlans) {
-        
-        // Map missing skills with dynamic priority
+                                                   List<RecommendedProject> projects) {
+        return AssessmentDetailsDto.builder()
+                .roadmap(buildRoadmapDto(milestones))
+                .projects(buildProjectsDto(projects))
+                .resources(buildResourcesDto(assessment))
+                .build();
+    }
+
+    private AssessmentResponseDto mergeResponse(AssessmentSummaryDto summary, AssessmentDetailsDto details) {
+        return AssessmentResponseDto.builder()
+                .assessmentId(summary.getAssessmentId())
+                .currentRole(summary.getCurrentRole())
+                .targetRole(summary.getTargetRole())
+                .marketFitScore(summary.getMarketFitScore())
+                .strengths(summary.getStrengths())
+                .weaknesses(summary.getWeaknesses())
+                .missingSkills(summary.getMissingSkills())
+                .summary(summary.getSummary())
+                .careerAdvice(summary.getCareerAdvice())
+                .roadmap(details.getRoadmap())
+                .projects(details.getProjects())
+                .resources(details.getResources())
+                .build();
+    }
+
+    private List<AssessmentResponseDto.SkillGapDto> buildMissingSkillsDto(List<String> missing) {
         List<AssessmentResponseDto.SkillGapDto> missingSkillsDto = new ArrayList<>();
-        List<String> missing = assessment.getMissingSkills();
         for (int i = 0; i < missing.size(); i++) {
             String priority = "Low";
             if (i < 3) {
@@ -186,10 +231,11 @@ public class AIOrchestrator {
                     .priority(priority)
                     .build());
         }
+        return missingSkillsDto;
+    }
 
-        // Map roadmap milestones to monthly roadmap items
-        // Grouping by Month Label (e.g. Month 1 -> List of topics)
-        List<AssessmentResponseDto.RoadmapItemDto> roadmapDto = milestones.stream()
+    private List<AssessmentResponseDto.RoadmapItemDto> buildRoadmapDto(List<RoadmapMilestone> milestones) {
+        return milestones.stream()
                 .collect(Collectors.groupingBy(RoadmapMilestone::getMonthLabel))
                 .entrySet().stream()
                 .map(entry -> AssessmentResponseDto.RoadmapItemDto.builder()
@@ -203,27 +249,32 @@ public class AIOrchestrator {
                         .build())
                 .sorted((a, b) -> a.getMonth().compareToIgnoreCase(b.getMonth()))
                 .collect(Collectors.toList());
+    }
 
-        // Map projects
-        List<AssessmentResponseDto.RecommendedProjectDto> projectsDto = projects.stream()
+    private List<AssessmentResponseDto.RecommendedProjectDto> buildProjectsDto(List<RecommendedProject> projects) {
+        return projects.stream()
                 .map(p -> AssessmentResponseDto.RecommendedProjectDto.builder()
                         .name(p.getTitle())
                         .duration(p.getDuration())
                         .skillsLearned(List.of(p.getDifficulty() + " level project"))
                         .build())
                 .collect(Collectors.toList());
+    }
 
-        // Map recommended resources from DB matching missing skills
+    private List<AssessmentResponseDto.LearningResourceDto> buildResourcesDto(Assessment assessment) {
         List<AssessmentResponseDto.LearningResourceDto> resourcesDto = new ArrayList<>();
+        List<String> missing = assessment.getMissingSkills();
         List<String> normalizedMissing = missing.stream().map(String::toLowerCase).collect(Collectors.toList());
-        
-        List<Resource> matchedResources = dbResources.stream()
-                .filter(res -> res.getSkills().stream().anyMatch(skill -> normalizedMissing.contains(skill.toLowerCase())))
+        String targetRole = assessment.getTargetRole() != null ? assessment.getTargetRole().toLowerCase() : "";
+        List<Resource> resourceCandidates = loadResourceCandidates(assessment);
+
+        List<Resource> matchedResources = resourceCandidates.stream()
+                .filter(res -> resourceMatchesProfile(res, normalizedMissing, targetRole))
+                .limit(5)
                 .collect(Collectors.toList());
 
-        // Fallback to top resources if no specific skill matches
-        if (matchedResources.isEmpty() && !dbResources.isEmpty()) {
-            matchedResources = dbResources.stream().limit(3).collect(Collectors.toList());
+        if (matchedResources.isEmpty()) {
+            matchedResources = resourceCandidates.stream().limit(5).collect(Collectors.toList());
         }
 
         for (Resource r : matchedResources) {
@@ -238,28 +289,61 @@ public class AIOrchestrator {
                     .link(r.getUrl())
                     .build());
         }
+        return resourcesDto;
+    }
 
-        // Map interview preparation phase
-        List<AssessmentResponseDto.InterviewPlanDto> interviewDto = interviewPlans.stream()
-                .map(ip -> AssessmentResponseDto.InterviewPlanDto.builder()
-                        .phaseLabel(ip.getPhaseLabel())
-                        .topics(ip.getTopics())
-                        .sampleQuestions(ip.getSampleQuestions())
-                        .build())
-                .collect(Collectors.toList());
+    private List<Resource> loadResourceCandidates(Assessment assessment) {
+        LinkedHashMap<Long, Resource> matched = new LinkedHashMap<>();
+        for (String skill : assessment.getMissingSkills()) {
+            for (Resource resource : resourceRepository.findBySkill(skill)) {
+                matched.put(resource.getId(), resource);
+            }
+        }
 
-        return AssessmentResponseDto.builder()
-                .marketFitScore(assessment.getScore())
-                .strengths(assessment.getStrengths())
-                .weaknesses(assessment.getWeaknesses())
-                .missingSkills(missingSkillsDto)
-                .roadmap(roadmapDto)
-                .projects(projectsDto)
-                .resources(resourcesDto)
-                .interviewPreparation(interviewDto)
-                .careerAdvice(assessment.getCareerAdvice())
-                .summary(assessment.getSummary())
-                .build();
+        if (!matched.isEmpty()) {
+            return new ArrayList<>(matched.values());
+        }
+
+        List<Resource> all = resourceRepository.findAll();
+        if (all.isEmpty()) {
+            return all;
+        }
+
+        int offset = (int) (assessment.getId() % all.size());
+        List<Resource> fallback = new ArrayList<>();
+        for (int i = 0; i < Math.min(5, all.size()); i++) {
+            fallback.add(all.get((offset + i) % all.size()));
+        }
+        return fallback;
+    }
+
+    private boolean resourceMatchesProfile(Resource resource, List<String> normalizedMissing, String targetRole) {
+        for (String skill : resource.getSkills()) {
+            String normalizedSkill = skill.toLowerCase();
+            for (String missing : normalizedMissing) {
+                if (normalizedSkill.equals(missing)
+                        || normalizedSkill.contains(missing)
+                        || missing.contains(normalizedSkill)) {
+                    return true;
+                }
+            }
+        }
+
+        if (targetRole.isBlank()) {
+            return false;
+        }
+
+        String roleToken = targetRole.replace('-', ' ');
+        if (resource.getCategory() != null && resource.getCategory().toLowerCase().contains(roleToken)) {
+            return true;
+        }
+        if (resource.getTitle() != null && resource.getTitle().toLowerCase().contains(roleToken)) {
+            return true;
+        }
+        return resource.getTags().stream().anyMatch(tag -> {
+            String normalizedTag = tag.toLowerCase();
+            return normalizedTag.contains(roleToken) || roleToken.contains(normalizedTag);
+        });
     }
 
     private String cleanJsonString(String response) {
@@ -276,7 +360,6 @@ public class AIOrchestrator {
         return response.trim();
     }
 
-    // Inner classes for Jackson parsing
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -288,7 +371,6 @@ public class AIOrchestrator {
         private List<String> missingSkills;
         private List<RoadmapMilestonePojo> roadmap;
         private List<RecommendedProjectPojo> recommendedProjects;
-        private List<InterviewPlanPojo> interviewPreparation;
         private String careerAdvice;
         private String summary;
     }
@@ -312,15 +394,5 @@ public class AIOrchestrator {
         private String description;
         private String difficulty;
         private String duration;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class InterviewPlanPojo {
-        private String phaseLabel;
-        private List<String> topics;
-        private List<String> sampleQuestions;
     }
 }

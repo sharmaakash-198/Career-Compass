@@ -19,30 +19,43 @@ class JwtServiceTest {
         jwtService = new JwtService();
         ReflectionTestUtils.setField(jwtService, "secretKey",
                 "01234567890123456789012345678901"); // 32 chars for HS256
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 3_600_000L);
+        ReflectionTestUtils.setField(jwtService, "accessExpiration", 3_600_000L);
+        ReflectionTestUtils.setField(jwtService, "refreshExpiration", 7_200_000L);
     }
 
     @Test
-    void generateToken_and_extractUsername_shouldNormalizeEmail() {
-        String token = jwtService.generateToken("  Test@Gmail.com ");
+    void generateAccessToken_and_extractUsername_shouldNormalizeEmail() {
+        String token = jwtService.generateAccessToken("  Test@Gmail.com ");
 
         assertEquals("test@gmail.com", jwtService.extractUsername(token));
-        assertTrue(jwtService.isTokenValid(token, "TEST@gmail.com"));
+        assertTrue(jwtService.isAccessToken(token));
+        assertTrue(jwtService.isAccessTokenValid(token, "TEST@gmail.com"));
+        assertFalse(jwtService.isRefreshToken(token));
     }
 
     @Test
-    void isTokenValid_shouldReturnFalse_whenEmailDoesNotMatch() {
-        String token = jwtService.generateToken("user@gmail.com");
+    void generateRefreshToken_shouldNotBeValidAsAccessToken() {
+        String refreshToken = jwtService.generateRefreshToken("user@gmail.com");
 
-        assertFalse(jwtService.isTokenValid(token, "other@gmail.com"));
+        assertTrue(jwtService.isRefreshToken(refreshToken));
+        assertTrue(jwtService.isRefreshTokenValid(refreshToken, "user@gmail.com"));
+        assertFalse(jwtService.isAccessToken(refreshToken));
+        assertFalse(jwtService.isAccessTokenValid(refreshToken, "user@gmail.com"));
     }
 
     @Test
-    void isTokenValid_shouldRejectExpiredToken() {
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", -1_000L);
-        String token = jwtService.generateToken("user@gmail.com");
+    void isAccessTokenValid_shouldReturnFalse_whenEmailDoesNotMatch() {
+        String token = jwtService.generateAccessToken("user@gmail.com");
+
+        assertFalse(jwtService.isAccessTokenValid(token, "other@gmail.com"));
+    }
+
+    @Test
+    void isAccessTokenValid_shouldRejectExpiredToken() {
+        ReflectionTestUtils.setField(jwtService, "accessExpiration", -1_000L);
+        String token = jwtService.generateAccessToken("user@gmail.com");
 
         assertThrows(ExpiredJwtException.class,
-                () -> jwtService.isTokenValid(token, "user@gmail.com"));
+                () -> jwtService.isAccessTokenValid(token, "user@gmail.com"));
     }
 }

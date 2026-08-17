@@ -2,22 +2,19 @@ package com.authentication.AuthProject.features.ai.service;
 
 import com.authentication.AuthProject.features.ai.client.NvidiaClient;
 import com.authentication.AuthProject.features.ai.prompt.PromptBuilder;
+import com.authentication.AuthProject.features.assessment.dto.AssessmentDetailsDto;
 import com.authentication.AuthProject.features.assessment.dto.AssessmentResponseDto;
+import com.authentication.AuthProject.features.assessment.dto.AssessmentSummaryDto;
 import com.authentication.AuthProject.features.assessment.entity.Assessment;
 import com.authentication.AuthProject.features.assessment.repository.AssessmentRepository;
 import com.authentication.AuthProject.features.user.entity.User;
-import com.authentication.AuthProject.features.interview.entity.InterviewPlan;
-import com.authentication.AuthProject.features.interview.repository.InterviewPlanRepository;
 import com.authentication.AuthProject.features.project.entity.RecommendedProject;
 import com.authentication.AuthProject.features.project.repository.RecommendedProjectRepository;
 import com.authentication.AuthProject.features.user.repository.UserRepository;
-import com.authentication.AuthProject.features.resource.entity.Resource;
 import com.authentication.AuthProject.features.resource.repository.ResourceRepository;
-import com.authentication.AuthProject.features.resume.entity.UserResume;
 import com.authentication.AuthProject.features.resume.repository.UserResumeRepository;
 import com.authentication.AuthProject.features.roadmap.entity.RoadmapMilestone;
 import com.authentication.AuthProject.features.roadmap.repository.RoadmapMilestoneRepository;
-import com.authentication.AuthProject.features.skill.entity.UserSkill;
 import com.authentication.AuthProject.features.skill.repository.UserSkillRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,9 +61,6 @@ public class AIOrchestratorTest {
     @Mock
     private RecommendedProjectRepository recommendedProjectRepository;
 
-    @Mock
-    private InterviewPlanRepository interviewPlanRepository;
-
     @InjectMocks
     private AIOrchestrator aiOrchestrator;
 
@@ -99,13 +93,6 @@ public class AIOrchestratorTest {
                 "      \"duration\": \"1 week\"\n" +
                 "    }\n" +
                 "  ],\n" +
-                "  \"interviewPreparation\": [\n" +
-                "    {\n" +
-                "      \"phaseLabel\": \"Foundations\",\n" +
-                "      \"topics\": [\"Containerization\"],\n" +
-                "      \"sampleQuestions\": [\"What is Docker?\"]\n" +
-                "    }\n" +
-                "  ],\n" +
                 "  \"careerAdvice\": \"Learn devops\",\n" +
                 "  \"summary\": \"Solid foundation\"\n" +
                 "}";
@@ -113,13 +100,10 @@ public class AIOrchestratorTest {
 
     @Test
     void testGenerateAssessment_Success() {
-        // Arrange
         when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
         when(userSkillRepository.findByUserId(1L)).thenReturn(Collections.emptyList());
-        when(userResumeRepository.findByUserId(1L)).thenReturn(Collections.emptyList());
-        when(resourceRepository.findAll()).thenReturn(Collections.emptyList());
         when(promptBuilder.buildSystemPrompt()).thenReturn("system-prompt");
-        when(promptBuilder.buildUserPrompt(any(), any(), any(), any())).thenReturn("user-prompt");
+        when(promptBuilder.buildUserPrompt(any(), any(), any())).thenReturn("user-prompt");
         when(nvidiaClient.callInference("system-prompt", "user-prompt")).thenReturn(rawJsonResponse);
 
         when(assessmentRepository.save(any(Assessment.class))).thenAnswer(inv -> {
@@ -127,14 +111,13 @@ public class AIOrchestratorTest {
             a.setId(10L);
             return a;
         });
-        when(roadmapMilestoneRepository.save(any(RoadmapMilestone.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(recommendedProjectRepository.save(any(RecommendedProject.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(interviewPlanRepository.save(any(InterviewPlan.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roadmapMilestoneRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(recommendedProjectRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(resourceRepository.findBySkill(any())).thenReturn(Collections.emptyList());
+        when(resourceRepository.findAll()).thenReturn(Collections.emptyList());
 
-        // Act
         AssessmentResponseDto response = aiOrchestrator.generateAssessment(1L, "Junior", "Mid Backend");
 
-        // Assert
         assertNotNull(response);
         assertEquals(80, response.getMarketFitScore());
         assertEquals("Solid foundation", response.getSummary());
@@ -145,20 +128,74 @@ public class AIOrchestratorTest {
         assertEquals("Month 1", response.getRoadmap().get(0).getMonth());
 
         verify(assessmentRepository, times(1)).save(any(Assessment.class));
-        verify(roadmapMilestoneRepository, times(1)).save(any(RoadmapMilestone.class));
-        verify(recommendedProjectRepository, times(1)).save(any(RecommendedProject.class));
-        verify(interviewPlanRepository, times(1)).save(any(InterviewPlan.class));
+        verify(roadmapMilestoneRepository, times(1)).saveAll(any());
+        verify(recommendedProjectRepository, times(1)).saveAll(any());
     }
 
     @Test
     void testGetLatestAssessment_Empty() {
-        // Arrange
         when(assessmentRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(Collections.emptyList());
 
-        // Act
         AssessmentResponseDto response = aiOrchestrator.getLatestAssessment(1L);
 
-        // Assert
         assertNull(response);
+    }
+
+    @Test
+    void testGetLatestSummary_returnsWithoutLoadingMilestones() {
+        Assessment assessment = Assessment.builder()
+                .id(10L)
+                .currentRole("Junior")
+                .targetRole("backend")
+                .score(75)
+                .missingSkills(List.of("Docker"))
+                .strengths(List.of("Java"))
+                .weaknesses(List.of("K8s"))
+                .summary("Good base")
+                .careerAdvice("Keep learning")
+                .build();
+
+        when(assessmentRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(assessment));
+
+        AssessmentSummaryDto summary = aiOrchestrator.getLatestSummary(1L);
+
+        assertNotNull(summary);
+        assertEquals(75, summary.getMarketFitScore());
+        assertEquals("Junior", summary.getCurrentRole());
+        verify(roadmapMilestoneRepository, never()).findByAssessmentIdOrderByMonthLabelAsc(any());
+        verify(recommendedProjectRepository, never()).findByAssessmentId(any());
+    }
+
+    @Test
+    void testGetLatestDetails_returnsRoadmapAndProjects() {
+        Assessment assessment = Assessment.builder()
+                .id(10L)
+                .targetRole("backend")
+                .missingSkills(List.of("Docker"))
+                .build();
+
+        RoadmapMilestone milestone = new RoadmapMilestone();
+        milestone.setMonthLabel("Month 1");
+        milestone.setTopicName("Docker");
+        milestone.setDescription("Basics");
+
+        RecommendedProject project = new RecommendedProject();
+        project.setTitle("API Dockerization");
+        project.setDuration("1 week");
+        project.setDifficulty("Intermediate");
+
+        when(assessmentRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(assessment));
+        when(roadmapMilestoneRepository.findByAssessmentIdOrderByMonthLabelAsc(10L)).thenReturn(List.of(milestone));
+        when(recommendedProjectRepository.findByAssessmentId(10L)).thenReturn(List.of(project));
+        when(resourceRepository.findBySkill(any())).thenReturn(Collections.emptyList());
+        when(resourceRepository.findAll()).thenReturn(Collections.emptyList());
+
+        AssessmentDetailsDto details = aiOrchestrator.getLatestDetails(1L);
+
+        assertNotNull(details);
+        assertEquals(1, details.getRoadmap().size());
+        assertEquals("Month 1", details.getRoadmap().get(0).getMonth());
+        assertEquals(1, details.getProjects().size());
+        assertEquals("API Dockerization", details.getProjects().get(0).getName());
     }
 }

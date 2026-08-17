@@ -13,6 +13,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,22 +32,34 @@ public class SkillService {
     public List<String> syncSkills(User user, List<String> skills) {
         List<String> normalized = normalizeSkills(skills);
         List<UserSkill> existing = userSkillRepository.findByUserId(user.getId());
+        Set<String> normalizedLower = normalized.stream()
+                .map(skill -> skill.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
 
-        for (UserSkill userSkill : existing) {
-            if (normalized.stream().noneMatch(s -> s.equalsIgnoreCase(userSkill.getSkillName()))) {
-                userSkillRepository.delete(userSkill);
-            }
+        List<UserSkill> toDelete = existing.stream()
+                .filter(userSkill -> !normalizedLower.contains(userSkill.getSkillName().toLowerCase(Locale.ROOT)))
+                .toList();
+        if (!toDelete.isEmpty()) {
+            userSkillRepository.deleteAllInBatch(toDelete);
         }
 
-        for (String skillName : normalized) {
-            if (userSkillRepository.findByUserIdAndSkillNameIgnoreCase(user.getId(), skillName).isEmpty()) {
-                UserSkill userSkill = new UserSkill();
-                userSkill.setUser(user);
-                userSkill.setSkillName(skillName);
-                userSkill.setSource("MANUAL");
-                userSkill.setCreatedAt(Instant.now());
-                userSkillRepository.save(userSkill);
-            }
+        Set<String> existingLower = existing.stream()
+                .map(userSkill -> userSkill.getSkillName().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        Instant now = Instant.now();
+        List<UserSkill> toAdd = normalized.stream()
+                .filter(skillName -> !existingLower.contains(skillName.toLowerCase(Locale.ROOT)))
+                .map(skillName -> {
+                    UserSkill userSkill = new UserSkill();
+                    userSkill.setUser(user);
+                    userSkill.setSkillName(skillName);
+                    userSkill.setSource("MANUAL");
+                    userSkill.setCreatedAt(now);
+                    return userSkill;
+                })
+                .toList();
+        if (!toAdd.isEmpty()) {
+            userSkillRepository.saveAll(toAdd);
         }
 
         return getSkillNames(user);

@@ -3,6 +3,7 @@ package com.authentication.AuthProject.features.auth.controller;
 import com.authentication.AuthProject.features.auth.dto.LoginRequest;
 import com.authentication.AuthProject.features.auth.dto.ResendOtpRequest;
 import com.authentication.AuthProject.features.auth.dto.SignupRequest;
+import com.authentication.AuthProject.features.auth.dto.RefreshTokenRequest;
 import com.authentication.AuthProject.features.auth.dto.VerifyOtpRequest;
 import com.authentication.AuthProject.features.auth.dto.AuthResponse;
 import com.authentication.AuthProject.features.auth.service.AuthService;
@@ -68,6 +69,17 @@ public class AuthController {
         log.info("Received OTP resend request for email: {}", request.getEmail());
         AuthResponse response = service.resendOtp(request);
         log.info("OTP resent for email: {}", request.getEmail());
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(
+             @Valid @RequestBody RefreshTokenRequest request) {
+
+        log.info("Received refresh token request");
+        AuthResponse response = service.refresh(request);
+        log.info("Token refreshed successfully");
 
         return ResponseEntity.ok(response);
     }

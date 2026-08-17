@@ -13,6 +13,9 @@ import java.util.List;
 @AllArgsConstructor
 public class AssessmentResponseDto {
 
+    private Long assessmentId;
+    private String currentRole;
+    private String targetRole;
     private int marketFitScore;
     private List<String> strengths;
     private List<String> weaknesses;
@@ -20,7 +23,6 @@ public class AssessmentResponseDto {
     private List<RoadmapItemDto> roadmap;
     private List<RecommendedProjectDto> projects;
     private List<LearningResourceDto> resources;
-    private List<InterviewPlanDto> interviewPreparation;
     private String careerAdvice;
     private String summary;
 
@@ -30,7 +32,7 @@ public class AssessmentResponseDto {
     @AllArgsConstructor
     public static class SkillGapDto {
         private String name;
-        private String priority; // "High", "Medium", "Low"
+        private String priority;
     }
 
     @Data
@@ -58,18 +60,8 @@ public class AssessmentResponseDto {
     @AllArgsConstructor
     public static class LearningResourceDto {
         private String name;
-        private String difficulty; // "Beginner", "Intermediate", "Advanced"
+        private String difficulty;
         private String duration;
         private String link;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class InterviewPlanDto {
-        private String phaseLabel;
-        private List<String> topics;
-        private List<String> sampleQuestions;
     }
 }

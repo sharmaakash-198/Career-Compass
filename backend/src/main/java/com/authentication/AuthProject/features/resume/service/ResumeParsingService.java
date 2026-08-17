@@ -15,7 +15,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -72,15 +75,27 @@ public class ResumeParsingService {
     }
 
     private void persistNewSkills(User user, List<String> skills) {
+        Set<String> existingNames = userSkillRepository.findByUserId(user.getId()).stream()
+                .map(skill -> skill.getSkillName().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        Instant now = Instant.now();
+        List<UserSkill> toAdd = new ArrayList<>();
+
         for (String skillName : skills) {
-            if (userSkillRepository.findByUserIdAndSkillNameIgnoreCase(user.getId(), skillName).isEmpty()) {
-                UserSkill userSkill = new UserSkill();
-                userSkill.setUser(user);
-                userSkill.setSkillName(skillName);
-                userSkill.setSource("RESUME");
-                userSkill.setCreatedAt(Instant.now());
-                userSkillRepository.save(userSkill);
+            if (existingNames.contains(skillName.toLowerCase(Locale.ROOT))) {
+                continue;
             }
+            UserSkill userSkill = new UserSkill();
+            userSkill.setUser(user);
+            userSkill.setSkillName(skillName);
+            userSkill.setSource("RESUME");
+            userSkill.setCreatedAt(now);
+            toAdd.add(userSkill);
+            existingNames.add(skillName.toLowerCase(Locale.ROOT));
+        }
+
+        if (!toAdd.isEmpty()) {
+            userSkillRepository.saveAll(toAdd);
         }
     }
 }

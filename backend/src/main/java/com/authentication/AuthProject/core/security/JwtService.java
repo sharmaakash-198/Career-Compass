@@ -19,21 +19,42 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secretKey;
 
-    @Value("${jwt.expiration}")
-    private long jwtExpiration;
+    @Value("${jwt.access-expiration}")
+    private long accessExpiration;
+
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpiration;
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateToken(String email) {
-        String normalizedEmail = normalizeEmail(email);
+    public String generateAccessToken(String email) {
         return Jwts.builder()
-                .subject(normalizedEmail)
+                .subject(normalizeEmail(email))
+                .claim("type", "access")
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .expiration(new Date(System.currentTimeMillis() + accessExpiration))
                 .signWith(getSigningKey())
                 .compact();
+    }
+
+    public boolean isAccessToken(String token) {
+        return "access".equals(extractClaim(token, c -> c.get("type", String.class)));
+    }
+
+    public String generateRefreshToken(String email) {
+        return Jwts.builder()
+                .subject(normalizeEmail(email))
+                .claim("type", "refresh")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public boolean isRefreshToken(String token) {
+        return "refresh".equals(extractClaim(token, c -> c.get("type", String.class)));
     }
 
     public String extractUsername(String token) {
@@ -49,14 +70,24 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
-    public boolean isTokenValid(String token, String email) {
+    public boolean isAccessTokenValid(String token, String email) {
         String subject = extractUsername(token);
-        return normalizeEmail(subject).equals(normalizeEmail(email)) && !isTokenExpired(token);
+        return isAccessToken(token)
+            && normalizeEmail(subject).equals(normalizeEmail(email))
+            && !isTokenExpired(token);
     }
 
-    private boolean isTokenExpired(String token) {
+    public boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
+
+    public boolean isRefreshTokenValid(String token, String email) {
+        String subject = extractUsername(token);
+        return isRefreshToken(token)
+            && normalizeEmail(subject).equals(normalizeEmail(email))
+            && !isTokenExpired(token);
+    }
+
 
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
