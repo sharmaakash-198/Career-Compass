@@ -63,6 +63,46 @@ export interface AnalysisResult {
   resources: LearningResource[];
 }
 
+export interface AssessmentSummary {
+  assessmentId?: number;
+  currentRole: string;
+  targetRole: string;
+  marketFitScore: number;
+  missingSkills: SkillGap[];
+  strengths?: string[];
+  weaknesses?: string[];
+  summary?: string;
+  careerAdvice?: string;
+}
+
+export interface AssessmentDetails {
+  roadmap: RoadmapItem[];
+  projects: RecommendedProject[];
+  resources: LearningResource[];
+}
+
+export function mergeAssessment(summary: AssessmentSummary, details: AssessmentDetails): AnalysisResult {
+  return {
+    marketFitScore: summary.marketFitScore,
+    missingSkills: summary.missingSkills,
+    trendingSkills: [],
+    roadmap: details.roadmap,
+    projects: details.projects,
+    resources: details.resources,
+  };
+}
+
+export type AssessmentJobStatusValue = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
+
+export interface AssessmentJobStatus {
+  jobId: number;
+  status: AssessmentJobStatusValue;
+  step?: number;
+  stepMessage?: string;
+  errorMessage?: string;
+  result?: AnalysisResult;
+}
+
 export interface TrendingSkillInsight {
   skill: string;
   roleId: string;
