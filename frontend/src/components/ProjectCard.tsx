@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FolderGit2, Clock, CheckSquare, Square, Info } from 'lucide-react';
+import { FolderGit2, Clock, CheckSquare, Square} from 'lucide-react';
 import type { RecommendedProject } from '../types';
 
 interface ProjectCardProps {
